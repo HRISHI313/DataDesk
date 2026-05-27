@@ -70,17 +70,101 @@ def duplicate_ali_analysis(dataframe):
         "duplicate_rows"  : duplicates
     }
 
+def construction_flag_percentages(dataframe):
+    logger.info("construction_flag_percentages() called")
+    df = dataframe.copy()
+    df[CONSTRUCTION_FLAG_COL] = df[CONSTRUCTION_FLAG_COL].fillna(NORMAL)
+    total = len(df)
+    counts = df[CONSTRUCTION_FLAG_COL].value_counts()
+    result = {
+        "Construction" : {
+            "count" : int(counts.get(CONSTRUCTION, 0)),
+            "pct"   : round(counts.get(CONSTRUCTION, 0) / total * 100, 1)
+        },
+        "Mall Tenant"  : {
+            "count" : int(counts.get(MALL_TENANT, 0)),
+            "pct"   : round(counts.get(MALL_TENANT, 0) / total * 100, 1)
+        },
+        "Multi Level"  : {
+            "count" : int(counts.get(MULTI_LEVEL, 0)),
+            "pct"   : round(counts.get(MULTI_LEVEL, 0) / total * 100, 1)
+        },
+        "Normal"       : {
+            "count" : int(counts.get(NORMAL, 0)),
+            "pct"   : round(counts.get(NORMAL, 0) / total * 100, 1)
+        }
+    }
+    logger.info(f"construction_flag_percentages() complete")
+    return result
+
+
+def polygon_status_percentages(dataframe):
+    logger.info("polygon_status_percentages() called")
+    total       = len(dataframe)
+    verified    = int(dataframe[POLYGON_STATUS_COL].eq(VERIFIED_QA).sum())
+    unverified  = total - verified
+    result = {
+        "Verified QA" : {
+            "count" : verified,
+            "pct"   : round(verified / total * 100, 1)
+        },
+        "Unverified"  : {
+            "count" : unverified,
+            "pct"   : round(unverified / total * 100, 1)
+        }
+    }
+    logger.info(f"polygon_status_percentages() complete")
+    return result
+
+
+def parent_ali_percentages(dataframe):
+    logger.info("parent_ali_percentages() called")
+    df    = dataframe.copy()
+    total = len(df)
+
+    connected = int(df[PARENT_ALI_COL].notna().sum())
+    unknown   = total - connected
+
+    # breakdown by retailer
+    df["Parent Status"] = df[PARENT_ALI_COL].apply(
+        lambda x: "Connected" if pd.notna(x) else "Unknown"
+    )
+
+    per_retailer = df.groupby(
+        [LIST_NAME_COL, "Parent Status"]
+    ).size().unstack(fill_value=0).reset_index()
+
+    per_retailer["Total"] = per_retailer.select_dtypes("number").sum(axis=1)
+
+    result = {
+        "connected"    : {
+            "count" : connected,
+            "pct"   : round(connected / total * 100, 1)
+        },
+        "unknown"      : {
+            "count" : unknown,
+            "pct"   : round(unknown / total * 100, 1)
+        },
+        "per_retailer" : per_retailer
+    }
+
+    logger.info(f"parent_ali_percentages() complete | connected: {connected} | unknown: {unknown}")
+    return result
+
 
 def get_full_analysis(dataframe):
     logger.info("get_full_analysis() started")
     result = {
-        "total_records"          : total_record(dataframe),
-        "unique_retailers"       : total_unique_retailers(dataframe),
-        "unique_retailers_count" : total_unique_retailers_count(dataframe),
-        "per_retailer"           : records_per_retailer(dataframe),
-        "construction_flag"      : construction_flag_breakdown(dataframe),
-        "polygon_status"         : polygon_status_breakdown(dataframe),
-        "duplicate_ali"          : duplicate_ali_analysis(dataframe)
+        "total_records"             : total_record(dataframe),
+        "unique_retailers"          : total_unique_retailers(dataframe),
+        "unique_retailers_count"    : total_unique_retailers_count(dataframe),
+        "per_retailer"              : records_per_retailer(dataframe),
+        "construction_flag"         : construction_flag_breakdown(dataframe),
+        "construction_pct"          : construction_flag_percentages(dataframe),
+        "polygon_status"            : polygon_status_breakdown(dataframe),
+        "polygon_pct"               : polygon_status_percentages(dataframe),
+        "duplicate_ali"             : duplicate_ali_analysis(dataframe),
+        "parent_ali"                : parent_ali_percentages(dataframe)
     }
     logger.info("get_full_analysis() complete")
     return result
