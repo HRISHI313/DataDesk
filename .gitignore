@@ -1,9 +1,36 @@
+# Virtual Environment
 venv/
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
+# Output and temp
 output/
 data/temp/
 
-tests/SAMPLE/
+# Test sample data (sensitive)
+tests/sample_data/
+
+# Logs
 logs/
+
+# Log file if created at root
+*.log
+
+# VS Code settings
+.vscode/
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
