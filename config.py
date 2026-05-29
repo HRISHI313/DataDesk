@@ -42,3 +42,8 @@ MALL_TENANT            = "Mall Tenant"
 MULTI_LEVEL            = "Multi Level"
 VERIFIED_QA            = "Verified QA"
 NORMAL                 = "Normal"
+
+# Comparison Types
+COMPARISON_ALI       = "ALI"
+COMPARISON_ADDRESS   = "Address"
+COMPARISON_MIGRATION = "Migration"
