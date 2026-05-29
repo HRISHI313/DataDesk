@@ -30,7 +30,7 @@ tab1, tab2, tab3 = st.tabs(["Analyser", "Comparator", "Task Launcher"])
 with tab1:
     st.subheader("Analyser")
 
-    uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls", "csv"])
 
     if uploaded_file:
 
@@ -122,16 +122,15 @@ with tab1:
             st.success("✅ No duplicate ALIs found")
 
 # ─── COMPARATOR TAB ─────────────────────────────────
-# ─── COMPARATOR TAB ─────────────────────────────────
 with tab2:
     st.subheader("Comparator")
 
     # ── File Upload ──────────────────────────────────
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        file1 = st.file_uploader("Upload File 1", type=["xlsx", "xls"], key="comp_file1")
+        file1 = st.file_uploader("Upload File 1", type=["xlsx", "xls", "csv"], key="comp_file1")
     with col_f2:
-        file2 = st.file_uploader("Upload File 2", type=["xlsx", "xls"], key="comp_file2")
+        file2 = st.file_uploader("Upload File 2", type=["xlsx", "xls", "csv"], key="comp_file2")
 
     # ── Comparison Type ──────────────────────────────
     comparison_type = st.selectbox(

@@ -42,7 +42,7 @@ def compare_by_ali(df1, df2):
     only_file2 = d2[~d2[ALI_COL].isin(d1[ALI_COL])].copy()
     logger.info(f"compare_by_ali() | only_file2: {len(only_file2)}")
 
-    conflicts = _get_conflicts(d1, d2, ALI_COL)
+    conflicts = _get_conflicts(d1, d2, ALI_COL, ADDRESS_COL)
     logger.info(f"compare_by_ali() | conflicts: {len(conflicts)}")
 
     logger.info("compare_by_ali() complete")
@@ -70,7 +70,7 @@ def compare_by_address(df1, df2):
     only_file2 = d2[~d2[ADDRESS_COL].isin(d1[ADDRESS_COL])].copy()
     logger.info(f"compare_by_address() | only_file2: {len(only_file2)}")
 
-    conflicts = _get_conflicts(d1, d2, ADDRESS_COL)
+    conflicts = _get_conflicts(d1, d2, ADDRESS_COL, ALI_COL)
     logger.info(f"compare_by_address() | conflicts: {len(conflicts)}")
 
     logger.info("compare_by_address() complete")
@@ -172,29 +172,26 @@ def compare_migration(df1, df2):
 
 
 # ─── CONFLICTS HELPER ───────────────────────────────
-def _get_conflicts(df1, df2, key_col):
-    logger.info(f"_get_conflicts() called | key: {key_col}")
+def _get_conflicts(df1, df2, key_col, check_col):
+    logger.info(f"_get_conflicts() called | key: {key_col} | check: {check_col}")
 
-    # get records where key exists in both
     common_keys = set(df1[key_col]).intersection(set(df2[key_col]))
 
     d1_common = df1[df1[key_col].isin(common_keys)].copy()
     d2_common = df2[df2[key_col].isin(common_keys)].copy()
 
-    # merge on key column
+    d1_common = d1_common.fillna("")
+    d2_common = d2_common.fillna("")
+
     merged = d1_common.merge(
         d2_common,
         on       = key_col,
         suffixes = ("_file1", "_file2")
     )
 
-    # find rows where any other column differs
-    check_cols = [col for col in OUTPUT_COLUMNS if col != key_col and col != LIST_NAME_COL]
-
-    conflict_mask = pd.Series(False, index=merged.index)
-    for col in check_cols:
-        if f"{col}_file1" in merged.columns and f"{col}_file2" in merged.columns:
-            conflict_mask |= merged[f"{col}_file1"] != merged[f"{col}_file2"]
+    conflict_mask = (
+        merged[f"{check_col}_file1"] != merged[f"{check_col}_file2"]
+    )
 
     conflicts = merged[conflict_mask].copy()
     logger.info(f"_get_conflicts() complete | conflicts: {len(conflicts)}")
