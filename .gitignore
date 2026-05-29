@@ -12,7 +12,7 @@ output/
 data/temp/
 
 # Test sample data (sensitive)
-tests/sample_data/
+test/Sample/
 
 # Logs
 logs/
