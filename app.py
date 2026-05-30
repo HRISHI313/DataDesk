@@ -54,6 +54,23 @@ with tab1:
         with st.spinner("Analysing..."):
             results = get_full_analysis(df)
 
+        # ── QC Error Check ───────────────────────────
+        if results["qc_errors"]["total_errors"] > 0:
+            st.warning(f"⚠️ {results['qc_errors']['total_errors']} QC Errors Found — records have Polygon Status but should not")
+
+            if len(results["qc_errors"]["mall_tenant_errors"]) > 0:
+                with st.expander(f"🔴 {len(results['qc_errors']['mall_tenant_errors'])} Mall Tenant records have Polygon Status — should never have one"):
+                    st.dataframe(results["qc_errors"]["mall_tenant_errors"], use_container_width=True)
+
+            if len(results["qc_errors"]["multi_level_errors"]) > 0:
+                with st.expander(f"🔴 {len(results['qc_errors']['multi_level_errors'])} Multi Level records have Polygon Status — should never have one"):
+                    st.dataframe(results["qc_errors"]["multi_level_errors"], use_container_width=True)
+
+            if len(results["qc_errors"]["construction_errors"]) > 0:
+                with st.expander(f"🔴 {len(results['qc_errors']['construction_errors'])} Construction records have Polygon Status — should never have one"):
+                    st.dataframe(results["qc_errors"]["construction_errors"], use_container_width=True)
+
+
         # ── Top Summary Cards ────────────────────────
         col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
         col1.metric("Total Records",         results["total_records"])
@@ -171,33 +188,32 @@ with tab2:
         # ── Type 1 and Type 2 Results ────────────────
         if comparison_type in [COMPARISON_ALI, COMPARISON_ADDRESS]:
 
-            logger.info(f"Displaying results | matched: {len(results['matched'])} | only_file1: {len(results['only_file1'])} | only_file2: {len(results['only_file2'])} | conflicts: {len(results['conflicts'])}")
-
             # summary cards
             c1, c2, c3, c4, c5 = st.columns(5)
-            c1.metric("File 1 Total",   len(df1))
-            c2.metric("File 2 Total",   len(df2))
-            c3.metric("Matched",        len(results["matched"]))
-            c4.metric("Only in File 1", len(results["only_file1"]))
-            c5.metric("Only in File 2", len(results["only_file2"]))
+            c1.metric("File 1 Total",  len(df1))
+            c2.metric("File 2 Total",  len(df2))
+            c3.metric("Matched",       len(results["matched"]))
+            c4.metric("Unmatched",     len(results["unmatched"]))
+            c5.metric("Conflicts",     len(results["conflicts"]))
 
             st.divider()
 
+            # matched
             with st.expander(f"✅ Matched — {len(results['matched'])} records"):
                 st.dataframe(results["matched"], use_container_width=True)
 
-            with st.expander(f"📁 Only in File 1 — {len(results['only_file1'])} records"):
-                st.dataframe(results["only_file1"], use_container_width=True)
+            # unmatched
+            if results["unmatched_duplicate_count"] > 0:
+                st.warning(f"⚠️ {results['unmatched_duplicate_count']} duplicate ALIs detected in unmatched records — review before acting")
 
-            with st.expander(f"📁 Only in File 2 — {len(results['only_file2'])} records"):
-                st.dataframe(results["only_file2"], use_container_width=True)
+            with st.expander(f"📋 Unmatched — {len(results['unmatched'])} records"):
+                st.dataframe(results["unmatched"], use_container_width=True)
 
+            # conflicts
             if len(results["conflicts"]) > 0:
-                logger.info(f"Conflicts found: {len(results['conflicts'])}")
                 with st.expander(f"⚠️ Conflicts — {len(results['conflicts'])} records"):
                     st.dataframe(results["conflicts"], use_container_width=True)
             else:
-                logger.info("No conflicts found")
                 st.success("✅ No conflicts found")
 
         # ── Type 3 Migration Results ─────────────────
@@ -205,15 +221,54 @@ with tab2:
 
             logger.info(f"Migration results | ali_changed_polygon_lost: {len(results['ali_changed_polygon_lost'])} | ali_changed_never_marked: {len(results['ali_changed_never_marked'])} | clean: {len(results['clean'])}")
 
+            # ── Summary Cards With Tooltips ──────────
             m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("Only in Old",                len(results["only_old"]))
-            m2.metric("Only in New",                len(results["only_new"]))
-            m3.metric("ALI Changed + Poly Lost",    len(results["ali_changed_polygon_lost"]))
-            m4.metric("ALI Changed + Never Marked", len(results["ali_changed_never_marked"]))
-            m5.metric("Clean Migration",            len(results["clean"]))
+            m1.metric("Only in Old",                len(results["only_old"]),
+                      help="Addresses in old file not found in new file. May be address format changes during migration.")
+            m2.metric("Only in New",                len(results["only_new"]),
+                      help="Addresses in new file not found in old file. New locations or changed address format.")
+            m3.metric("ALI Changed + Poly Lost",    len(results["ali_changed_polygon_lost"]),
+                      help="Address matched, ALI got a new number, Polygon Status was lost. These need redrawing.")
+            m4.metric("ALI Changed + Never Marked", len(results["ali_changed_never_marked"]),
+                      help="Address matched, ALI changed, but was never marked before either. Track the new ALI.")
+            m5.metric("Clean Migration",            len(results["clean"]),
+                      help="Everything matched perfectly. No action needed.")
 
             st.divider()
 
+            # ── Help Popover ─────────────────────────
+            with st.popover("ℹ️ How to read these results"):
+                st.markdown("""
+                    **🔴 ALI Changed + Polygon Lost**
+                    Address matched, ALI got a new number, Polygon Status was lost. These need redrawing.
+
+                    ---
+
+                    **🟡 ALI Changed + Never Marked**
+                    Address matched, ALI changed, but was never marked before either. Track new ALI.
+
+                    ---
+
+                    **🟡 Polygon Lost Only**
+                    Address matched, ALI intact, but Polygon Status was lost. Redrawing needed.
+
+                    ---
+
+                    **📁 Only in Old File**
+                    Address not found in new file. May be address format change during migration.
+
+                    ---
+
+                    **📁 Only in New File**
+                    Address not found in old file. New locations or changed address format.
+
+                    ---
+
+                    **✅ Clean Migration**
+                    Everything matched perfectly. No action needed.
+                """)
+
+            # ── Expanders ────────────────────────────
             if len(results["ali_changed_polygon_lost"]) > 0:
                 with st.expander(f"🔴 ALI Changed + Polygon Lost — {len(results['ali_changed_polygon_lost'])} records"):
                     st.dataframe(results["ali_changed_polygon_lost"], use_container_width=True)

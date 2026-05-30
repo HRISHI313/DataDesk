@@ -151,6 +151,42 @@ def parent_ali_percentages(dataframe):
     logger.info(f"parent_ali_percentages() complete | connected: {connected} | unknown: {unknown}")
     return result
 
+def qc_error_check(dataframe):
+    logger.info("qc_error_check() called")
+    df = dataframe.copy()
+
+    # records that should NEVER have polygon status
+    # but do have a value in Polygon Status column
+    mall_tenant_errors = df[
+        (df[CONSTRUCTION_FLAG_COL] == MALL_TENANT) &
+        (df[POLYGON_STATUS_COL].notna())
+    ]
+
+    multi_level_errors = df[
+        (df[CONSTRUCTION_FLAG_COL] == MULTI_LEVEL) &
+        (df[POLYGON_STATUS_COL].notna())
+    ]
+
+    construction_errors = df[
+        (df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION) &
+        (df[POLYGON_STATUS_COL].notna())
+    ]
+
+    total_errors = (
+        len(mall_tenant_errors) +
+        len(multi_level_errors) +
+        len(construction_errors)
+    )
+
+    logger.info(f"qc_error_check() | mall_tenant: {len(mall_tenant_errors)} | multi_level: {len(multi_level_errors)} | construction: {len(construction_errors)}")
+
+    return {
+        "total_errors"        : total_errors,
+        "mall_tenant_errors"  : mall_tenant_errors,
+        "multi_level_errors"  : multi_level_errors,
+        "construction_errors" : construction_errors
+    }
+
 
 def get_full_analysis(dataframe):
     logger.info("get_full_analysis() started")
@@ -164,7 +200,8 @@ def get_full_analysis(dataframe):
         "polygon_status"            : polygon_status_breakdown(dataframe),
         "polygon_pct"               : polygon_status_percentages(dataframe),
         "duplicate_ali"             : duplicate_ali_analysis(dataframe),
-        "parent_ali"                : parent_ali_percentages(dataframe)
+        "parent_ali"                : parent_ali_percentages(dataframe),
+        "qc_errors"                 : qc_error_check(dataframe)
     }
     logger.info("get_full_analysis() complete")
     return result

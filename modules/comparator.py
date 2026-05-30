@@ -17,161 +17,41 @@ OUTPUT_COLUMNS = [
 ]
 
 
-# ─── HELPER ─────────────────────────────────────────
+# ─── HELPER — EXTRACT COLUMNS ───────────────────────
 def extract_columns(df):
     logger.info("extract_columns() called")
     available = [col for col in OUTPUT_COLUMNS if col in df.columns]
-    result = df[available].copy()
+    result    = df[available].copy()
     logger.info(f"extract_columns() complete | {len(available)} columns extracted")
     return result
 
 
-# ─── TYPE 1 — ALI COMPARISON ────────────────────────
-def compare_by_ali(df1, df2):
-    logger.info("compare_by_ali() called")
+# ─── HELPER — GET UNMATCHED ─────────────────────────
+def _get_unmatched(only_file1, only_file2, key_col):
+    logger.info(f"_get_unmatched() called | key: {key_col}")
 
-    d1 = extract_columns(df1)
-    d2 = extract_columns(df2)
+    # add source column
+    only_file1 = only_file1.copy()
+    only_file2 = only_file2.copy()
+    only_file1["Source"] = "File 1"
+    only_file2["Source"] = "File 2"
 
-    matched = d1[d1[ALI_COL].isin(d2[ALI_COL])].copy()
-    logger.info(f"compare_by_ali() | matched: {len(matched)}")
+    # combine
+    unmatched = pd.concat([only_file1, only_file2], ignore_index=True)
 
-    only_file1 = d1[~d1[ALI_COL].isin(d2[ALI_COL])].copy()
-    logger.info(f"compare_by_ali() | only_file1: {len(only_file1)}")
+    # flag duplicates on key column
+    unmatched["Duplicate"] = unmatched[key_col].duplicated(keep=False).map({
+        True  : "⚠️ Yes",
+        False : "No"
+    })
 
-    only_file2 = d2[~d2[ALI_COL].isin(d1[ALI_COL])].copy()
-    logger.info(f"compare_by_ali() | only_file2: {len(only_file2)}")
+    duplicate_count = unmatched[key_col].duplicated().sum()
 
-    conflicts = _get_conflicts(d1, d2, ALI_COL, ADDRESS_COL)
-    logger.info(f"compare_by_ali() | conflicts: {len(conflicts)}")
-
-    logger.info("compare_by_ali() complete")
-    return {
-        "matched"    : matched,
-        "only_file1" : only_file1,
-        "only_file2" : only_file2,
-        "conflicts"  : conflicts
-    }
+    logger.info(f"_get_unmatched() complete | total: {len(unmatched)} | duplicates: {duplicate_count}")
+    return unmatched, duplicate_count
 
 
-# ─── TYPE 2 — ADDRESS COMPARISON ────────────────────
-def compare_by_address(df1, df2):
-    logger.info("compare_by_address() called")
-
-    d1 = extract_columns(df1)
-    d2 = extract_columns(df2)
-
-    matched = d1[d1[ADDRESS_COL].isin(d2[ADDRESS_COL])].copy()
-    logger.info(f"compare_by_address() | matched: {len(matched)}")
-
-    only_file1 = d1[~d1[ADDRESS_COL].isin(d2[ADDRESS_COL])].copy()
-    logger.info(f"compare_by_address() | only_file1: {len(only_file1)}")
-
-    only_file2 = d2[~d2[ADDRESS_COL].isin(d1[ADDRESS_COL])].copy()
-    logger.info(f"compare_by_address() | only_file2: {len(only_file2)}")
-
-    conflicts = _get_conflicts(d1, d2, ADDRESS_COL, ALI_COL)
-    logger.info(f"compare_by_address() | conflicts: {len(conflicts)}")
-
-    logger.info("compare_by_address() complete")
-    return {
-        "matched"    : matched,
-        "only_file1" : only_file1,
-        "only_file2" : only_file2,
-        "conflicts"  : conflicts
-    }
-
-
-# ─── TYPE 3 — MIGRATION COMPARISON ──────────────────
-def compare_migration(df1, df2):
-    logger.info("compare_migration() called")
-
-    d1 = extract_columns(df1)
-    d2 = extract_columns(df2)
-
-    # merge on address
-    merged = d1.merge(
-        d2,
-        on       = ADDRESS_COL,
-        how      = "outer",
-        suffixes = ("_old", "_new"),
-        indicator = True
-    )
-    logger.info(f"compare_migration() | merged shape: {merged.shape}")
-
-    # only in old file
-    only_old = merged[merged["_merge"] == "left_only"].copy()
-    only_old = only_old[[
-        f"{LIST_NAME_COL}_old",
-        f"{ALI_COL}_old",
-        ADDRESS_COL,
-        f"{CITY_COL}_old",
-        f"{ZIP_COL}_old",
-        f"{POLYGON_STATUS_COL}_old"
-    ]]
-    only_old.columns = [LIST_NAME_COL, ALI_COL, ADDRESS_COL, CITY_COL, ZIP_COL, POLYGON_STATUS_COL]
-    logger.info(f"compare_migration() | only_old: {len(only_old)}")
-
-    # only in new file
-    only_new = merged[merged["_merge"] == "right_only"].copy()
-    only_new = only_new[[
-        f"{LIST_NAME_COL}_new",
-        f"{ALI_COL}_new",
-        ADDRESS_COL,
-        f"{CITY_COL}_new",
-        f"{ZIP_COL}_new",
-        f"{POLYGON_STATUS_COL}_new"
-    ]]
-    only_new.columns = [LIST_NAME_COL, ALI_COL, ADDRESS_COL, CITY_COL, ZIP_COL, POLYGON_STATUS_COL]
-    logger.info(f"compare_migration() | only_new: {len(only_new)}")
-
-    # address matched records
-    both = merged[merged["_merge"] == "both"].copy()
-    logger.info(f"compare_migration() | address matched: {len(both)}")
-
-    # ALI changed + polygon lost
-    ali_changed_polygon_lost = both[
-        (both[f"{ALI_COL}_old"] != both[f"{ALI_COL}_new"]) &
-        (both[f"{POLYGON_STATUS_COL}_old"].notna()) &
-        (both[f"{POLYGON_STATUS_COL}_new"].isna())
-    ].copy()
-    logger.info(f"compare_migration() | ali_changed_polygon_lost: {len(ali_changed_polygon_lost)}")
-
-    # ALI changed + never marked
-    ali_changed_never_marked = both[
-        (both[f"{ALI_COL}_old"] != both[f"{ALI_COL}_new"]) &
-        (both[f"{POLYGON_STATUS_COL}_old"].isna()) &
-        (both[f"{POLYGON_STATUS_COL}_new"].isna())
-    ].copy()
-    logger.info(f"compare_migration() | ali_changed_never_marked: {len(ali_changed_never_marked)}")
-
-    # polygon lost only — ALI same
-    polygon_lost_only = both[
-        (both[f"{ALI_COL}_old"] == both[f"{ALI_COL}_new"]) &
-        (both[f"{POLYGON_STATUS_COL}_old"].notna()) &
-        (both[f"{POLYGON_STATUS_COL}_new"].isna())
-    ].copy()
-    logger.info(f"compare_migration() | polygon_lost_only: {len(polygon_lost_only)}")
-
-    # clean migration
-    clean = both[
-        (both[f"{ALI_COL}_old"] == both[f"{ALI_COL}_new"]) &
-        (both[f"{POLYGON_STATUS_COL}_old"] == both[f"{POLYGON_STATUS_COL}_new"])
-    ].copy()
-    logger.info(f"compare_migration() | clean: {len(clean)}")
-
-    logger.info("compare_migration() complete")
-    return {
-        "only_old"                : only_old,
-        "only_new"                : only_new,
-        "ali_changed_polygon_lost": ali_changed_polygon_lost,
-        "ali_changed_never_marked": ali_changed_never_marked,
-        "polygon_lost_only"       : polygon_lost_only,
-        "clean"                   : clean
-    }
-
-
-# ─── CONFLICTS HELPER ───────────────────────────────
+# ─── HELPER — GET CONFLICTS ─────────────────────────
 def _get_conflicts(df1, df2, key_col, check_col):
     logger.info(f"_get_conflicts() called | key: {key_col} | check: {check_col}")
 
@@ -179,6 +59,9 @@ def _get_conflicts(df1, df2, key_col, check_col):
 
     d1_common = df1[df1[key_col].isin(common_keys)].copy()
     d2_common = df2[df2[key_col].isin(common_keys)].copy()
+
+    d1_common = d1_common.drop_duplicates(subset=[key_col])
+    d2_common = d2_common.drop_duplicates(subset=[key_col])
 
     d1_common = d1_common.fillna("")
     d2_common = d2_common.fillna("")
@@ -196,6 +79,137 @@ def _get_conflicts(df1, df2, key_col, check_col):
     conflicts = merged[conflict_mask].copy()
     logger.info(f"_get_conflicts() complete | conflicts: {len(conflicts)}")
     return conflicts
+
+
+# ─── TYPE 1 — ALI COMPARISON ────────────────────────
+def compare_by_ali(df1, df2):
+    logger.info("compare_by_ali() started")
+    logger.info(f"compare_by_ali() | File1: {len(df1)} rows | File2: {len(df2)} rows")
+
+    d1 = extract_columns(df1)
+    d2 = extract_columns(df2)
+
+    matched    = d1[d1[ALI_COL].isin(d2[ALI_COL])].copy()
+    only_file1 = d1[~d1[ALI_COL].isin(d2[ALI_COL])].copy()
+    only_file2 = d2[~d2[ALI_COL].isin(d1[ALI_COL])].copy()
+
+    unmatched, duplicate_count = _get_unmatched(only_file1, only_file2, ALI_COL)
+    conflicts                  = _get_conflicts(d1, d2, ALI_COL, ADDRESS_COL)
+
+    logger.info(f"compare_by_ali() | matched: {len(matched)} | unmatched: {len(unmatched)} | conflicts: {len(conflicts)}")
+    logger.info("compare_by_ali() complete")
+
+    return {
+        "matched"                   : matched,
+        "unmatched"                 : unmatched,
+        "unmatched_duplicate_count" : duplicate_count,
+        "conflicts"                 : conflicts
+    }
+
+
+# ─── TYPE 2 — ADDRESS COMPARISON ────────────────────
+def compare_by_address(df1, df2):
+    logger.info("compare_by_address() started")
+    logger.info(f"compare_by_address() | File1: {len(df1)} rows | File2: {len(df2)} rows")
+
+    d1 = extract_columns(df1)
+    d2 = extract_columns(df2)
+
+    matched    = d1[d1[ADDRESS_COL].isin(d2[ADDRESS_COL])].copy()
+    only_file1 = d1[~d1[ADDRESS_COL].isin(d2[ADDRESS_COL])].copy()
+    only_file2 = d2[~d2[ADDRESS_COL].isin(d1[ADDRESS_COL])].copy()
+
+    unmatched, duplicate_count = _get_unmatched(only_file1, only_file2, ADDRESS_COL)
+    conflicts                  = _get_conflicts(d1, d2, ADDRESS_COL, ALI_COL)
+
+    logger.info(f"compare_by_address() | matched: {len(matched)} | unmatched: {len(unmatched)} | conflicts: {len(conflicts)}")
+    logger.info("compare_by_address() complete")
+
+    return {
+        "matched"                   : matched,
+        "unmatched"                 : unmatched,
+        "unmatched_duplicate_count" : duplicate_count,
+        "conflicts"                 : conflicts
+    }
+
+
+# ─── TYPE 3 — MIGRATION COMPARISON ──────────────────
+def compare_migration(df1, df2):
+    logger.info("compare_migration() called")
+
+    d1 = extract_columns(df1)
+    d2 = extract_columns(df2)
+
+    merged = d1.merge(
+        d2,
+        on        = ADDRESS_COL,
+        how       = "outer",
+        suffixes  = ("_old", "_new"),
+        indicator = True
+    )
+    logger.info(f"compare_migration() | merged shape: {merged.shape}")
+
+    only_old = merged[merged["_merge"] == "left_only"].copy()
+    only_old = only_old[[
+        f"{LIST_NAME_COL}_old",
+        f"{ALI_COL}_old",
+        ADDRESS_COL,
+        f"{CITY_COL}_old",
+        f"{ZIP_COL}_old",
+        f"{POLYGON_STATUS_COL}_old"
+    ]]
+    only_old.columns = [LIST_NAME_COL, ALI_COL, ADDRESS_COL, CITY_COL, ZIP_COL, POLYGON_STATUS_COL]
+    logger.info(f"compare_migration() | only_old: {len(only_old)}")
+
+    only_new = merged[merged["_merge"] == "right_only"].copy()
+    only_new = only_new[[
+        f"{LIST_NAME_COL}_new",
+        f"{ALI_COL}_new",
+        ADDRESS_COL,
+        f"{CITY_COL}_new",
+        f"{ZIP_COL}_new",
+        f"{POLYGON_STATUS_COL}_new"
+    ]]
+    only_new.columns = [LIST_NAME_COL, ALI_COL, ADDRESS_COL, CITY_COL, ZIP_COL, POLYGON_STATUS_COL]
+    logger.info(f"compare_migration() | only_new: {len(only_new)}")
+
+    both = merged[merged["_merge"] == "both"].copy()
+    logger.info(f"compare_migration() | address matched: {len(both)}")
+
+    ali_changed_polygon_lost = both[
+        (both[f"{ALI_COL}_old"] != both[f"{ALI_COL}_new"]) &
+        (both[f"{POLYGON_STATUS_COL}_old"].notna()) &
+        (both[f"{POLYGON_STATUS_COL}_new"].isna())
+    ].copy()
+
+    ali_changed_never_marked = both[
+        (both[f"{ALI_COL}_old"] != both[f"{ALI_COL}_new"]) &
+        (both[f"{POLYGON_STATUS_COL}_old"].isna()) &
+        (both[f"{POLYGON_STATUS_COL}_new"].isna())
+    ].copy()
+
+    polygon_lost_only = both[
+        (both[f"{ALI_COL}_old"] == both[f"{ALI_COL}_new"]) &
+        (both[f"{POLYGON_STATUS_COL}_old"].notna()) &
+        (both[f"{POLYGON_STATUS_COL}_new"].isna())
+    ].copy()
+
+    clean = both[
+        (both[f"{ALI_COL}_old"] == both[f"{ALI_COL}_new"]) &
+        (both[f"{POLYGON_STATUS_COL}_old"] == both[f"{POLYGON_STATUS_COL}_new"])
+    ].copy()
+
+    logger.info(f"compare_migration() | ali_changed_polygon_lost: {len(ali_changed_polygon_lost)} | ali_changed_never_marked: {len(ali_changed_never_marked)} | polygon_lost_only: {len(polygon_lost_only)} | clean: {len(clean)}")
+    logger.info("compare_migration() complete")
+
+    return {
+        "only_old"                : only_old,
+        "only_new"                : only_new,
+        "ali_changed_polygon_lost": ali_changed_polygon_lost,
+        "ali_changed_never_marked": ali_changed_never_marked,
+        "polygon_lost_only"       : polygon_lost_only,
+        "clean"                   : clean
+    }
 
 
 # ─── MASTER FUNCTION ────────────────────────────────
@@ -217,3 +231,6 @@ def get_comparison_summary(df1, df2, comparison_type):
 
     logger.info("get_comparison_summary() complete")
     return result
+
+
+
