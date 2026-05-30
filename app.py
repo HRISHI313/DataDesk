@@ -70,6 +70,32 @@ with tab1:
                 with st.expander(f"🔴 {len(results['qc_errors']['construction_errors'])} Construction records have Polygon Status — should never have one"):
                     st.dataframe(results["qc_errors"]["construction_errors"], use_container_width=True)
 
+        # ── Polygon Coverage ─────────────────────────
+        st.subheader("Polygon Coverage")
+
+        marked_pct    = results["polygon_coverage"]["marked_pct"]
+        pending_pct   = results["polygon_coverage"]["pending_pct"]
+        marked_count  = results["polygon_coverage"]["marked_count"]
+        pending_count = results["polygon_coverage"]["pending_count"]
+        total         = results["polygon_coverage"]["total"]
+
+        st.caption(f"Marked — {marked_count} of {total} records ({marked_pct}%)")
+        st.progress(marked_pct / 100)
+
+        st.caption(f"Pending — {pending_count} of {total} records ({pending_pct}%)")
+        st.progress(pending_pct / 100)
+
+        st.divider()
+
+        with st.expander("📊 View Breakdown"):
+            b1, b2, b3, b4, b5 = st.columns(5)
+            b1.metric("Mall Tenant",     results["polygon_coverage"]["mall_tenant_count"])
+            b2.metric("Multi Level",     results["polygon_coverage"]["multi_level_count"])
+            b3.metric("Construction",    results["polygon_coverage"]["construction_count"])
+            b4.metric("Polygon Done",    results["polygon_coverage"]["polygon_done_count"])
+            b5.metric("Polygon Missing", results["polygon_coverage"]["polygon_missing_count"])
+
+        st.divider()
 
         # ── Top Summary Cards ────────────────────────
         col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
@@ -80,24 +106,6 @@ with tab1:
         col5.metric("Unique ALIs",           results["duplicate_ali"]["unique_ali"])
         col6.metric("Connected to Property", results["parent_ali"]["connected"]["count"])
         col7.metric("Pending Property",      results["parent_ali"]["unknown"]["count"])
-
-        st.divider()
-
-        # ── Construction Flag ────────────────────────
-        st.subheader("Construction Flag")
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Construction",
-                  results["construction_pct"]["Construction"]["count"],
-                  f'{results["construction_pct"]["Construction"]["pct"]}%')
-        c2.metric("Mall Tenant",
-                  results["construction_pct"]["Mall Tenant"]["count"],
-                  f'{results["construction_pct"]["Mall Tenant"]["pct"]}%')
-        c3.metric("Multi Level",
-                  results["construction_pct"]["Multi Level"]["count"],
-                  f'{results["construction_pct"]["Multi Level"]["pct"]}%')
-        c4.metric("Normal",
-                  results["construction_pct"]["Normal"]["count"],
-                  f'{results["construction_pct"]["Normal"]["pct"]}%')
 
         st.divider()
 

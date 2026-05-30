@@ -187,6 +187,48 @@ def qc_error_check(dataframe):
         "construction_errors" : construction_errors
     }
 
+def polygon_coverage(dataframe):
+    logger.info("polygon_coverage() called")
+    df    = dataframe.copy()
+    total = len(df)
+
+    df[CONSTRUCTION_FLAG_COL] = df[CONSTRUCTION_FLAG_COL].fillna(NORMAL)
+
+    # ── Marked ──────────────────────────────────────
+    mall_tenant_rows  = df[df[CONSTRUCTION_FLAG_COL] == MALL_TENANT]
+    multi_level_rows  = df[df[CONSTRUCTION_FLAG_COL] == MULTI_LEVEL]
+    polygon_done_rows = df[
+        (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
+        (df[POLYGON_STATUS_COL].notna())
+    ]
+
+    # ── Pending ──────────────────────────────────────
+    construction_rows   = df[df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION]
+    polygon_missing_rows = df[
+        (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
+        (df[POLYGON_STATUS_COL].isna())
+    ]
+
+    # ── Counts ───────────────────────────────────────
+    marked_count  = len(mall_tenant_rows) + len(multi_level_rows) + len(polygon_done_rows)
+    pending_count = len(construction_rows) + len(polygon_missing_rows)
+
+    result = {
+        "total"                : total,
+        "marked_count"         : marked_count,
+        "marked_pct"           : round(marked_count / total * 100, 1),
+        "pending_count"        : pending_count,
+        "pending_pct"          : round(pending_count / total * 100, 1),
+        "mall_tenant_count"    : len(mall_tenant_rows),
+        "multi_level_count"    : len(multi_level_rows),
+        "polygon_done_count"   : len(polygon_done_rows),
+        "construction_count"   : len(construction_rows),
+        "polygon_missing_count": len(polygon_missing_rows)
+    }
+
+    logger.info(f"polygon_coverage() | marked: {marked_count} | pending: {pending_count}")
+    return result
+
 
 def get_full_analysis(dataframe):
     logger.info("get_full_analysis() started")
@@ -199,6 +241,7 @@ def get_full_analysis(dataframe):
         "construction_pct"          : construction_flag_percentages(dataframe),
         "polygon_status"            : polygon_status_breakdown(dataframe),
         "polygon_pct"               : polygon_status_percentages(dataframe),
+        "polygon_coverage"          : polygon_coverage(dataframe),
         "duplicate_ali"             : duplicate_ali_analysis(dataframe),
         "parent_ali"                : parent_ali_percentages(dataframe),
         "qc_errors"                 : qc_error_check(dataframe)
