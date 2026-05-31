@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import io
 
 logger = logging.getLogger("datadesk")
 
@@ -34,3 +35,23 @@ def read_excel(uploaded_file):
     combined_df = pd.concat(all_sheets, ignore_index=True)
     logger.info(f"All sheets combined | total {len(combined_df)} rows")
     return combined_df
+
+def write_excel(df, filename):
+    logger.info(f"write_excel() called | filename: {filename}")
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+    logger.info(f"write_excel() complete | {len(df)} rows")
+    return output
+
+
+def write_multi_sheet_excel(sheets_dict, filename):
+    logger.info(f"write_multi_sheet_excel() called | filename: {filename} | sheets: {list(sheets_dict.keys())}")
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        for sheet_name, df in sheets_dict.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            logger.info(f"Sheet written: {sheet_name} | {len(df)} rows")
+    output.seek(0)
+    logger.info(f"write_multi_sheet_excel() complete | {len(sheets_dict)} sheets")
+    return output

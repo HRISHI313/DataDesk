@@ -7,6 +7,7 @@ from utils.file_handler import read_excel
 from utils.validators import validate_required_columns, validate_file_not_empty
 from modules.analyser import get_full_analysis
 from modules.comparator import get_comparison_summary
+from modules.task_launcher import *
 
 # ─── LOGGING SETUP ──────────────────────────────────
 logger = setup_logger()
@@ -302,5 +303,334 @@ with tab2:
 
 # ─── LAUNCHER TAB ───────────────────────────────────
 with tab3:
-    st.subheader("Launcher")
-    st.info("Coming soon")
+    st.subheader("Task Launcher")
+
+    # ── File Upload ──────────────────────────────────
+    launcher_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls", "csv"], key="launcher_file")
+
+    if launcher_file:
+
+        with st.spinner("Reading file..."):
+            df_launcher = read_excel(launcher_file)
+
+        try:
+            validate_file_not_empty(df_launcher)
+            validate_required_columns(df_launcher)
+        except ValueError as e:
+            logger.error(f"Launcher validation failed: {str(e)}")
+            st.error(str(e))
+            st.stop()
+
+        st.caption(f"📄 {launcher_file.name}  |  {len(df_launcher)} rows")
+        st.divider()
+
+        # ── Detect Mode ──────────────────────────────
+        mode            = detect_retailer_mode(df_launcher)
+        retailer_counts = get_retailer_counts(df_launcher)
+        total_alis      = len(df_launcher)
+
+        if mode == "single":
+            st.info(f"📋 Single Retailer Mode — {list(retailer_counts.keys())[0]} | {total_alis} ALIs")
+        else:
+            st.info(f"📋 Multi Retailer Mode — {len(retailer_counts)} retailers | {total_alis} ALIs")
+
+        st.divider()
+
+        # ── Analyst Setup ────────────────────────────
+        st.subheader("Analyst Setup")
+        num_analysts = st.number_input("Number of Analysts", min_value=1, max_value=20, value=2, step=1)
+
+        analyst_names = []
+        name_cols     = st.columns(num_analysts)
+        for i, col in enumerate(name_cols):
+            name = col.text_input(f"Analyst {i+1} Name", value=f"Analyst {i+1}", key=f"analyst_name_{i}")
+            analyst_names.append(name)
+
+        target, remainder = calculate_target(total_alis, num_analysts)
+
+        st.divider()
+
+        # ─────────────────────────────────────────────
+        # SINGLE RETAILER MODE
+        # ─────────────────────────────────────────────
+        if mode == "single":
+
+            st.subheader("Distribution")
+
+            t_cols = st.columns(num_analysts)
+            for i, (col, name) in enumerate(zip(t_cols, analyst_names)):
+                target_count = target + remainder if i == 0 else target
+                col.metric(name, f"{target_count} ALIs")
+
+            st.divider()
+
+            if st.button("Generate Excel", key="single_generate"):
+                with st.spinner("Building task list..."):
+                    assignments = equal_split(df_launcher, analyst_names)
+                    sheets_dict = build_output_excel(assignments)
+                    from utils.file_handler import write_multi_sheet_excel
+                    from datetime import datetime
+                    filename = f"TaskList_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    output   = write_multi_sheet_excel(sheets_dict, filename)
+
+                st.success("✅ Task list ready")
+                st.download_button(
+                    label     = "📥 Download Task List",
+                    data      = output,
+                    file_name = filename,
+                    mime      = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                logger.info(f"Single mode Excel generated | {filename}")
+
+        # ─────────────────────────────────────────────
+        # MULTI RETAILER MODE
+        # ─────────────────────────────────────────────
+        else:
+
+            # initialize session state
+            if "retailer_assignments" not in st.session_state:
+                st.session_state["retailer_assignments"] = {}
+            if "split_counts" not in st.session_state:
+                st.session_state["split_counts"] = {}
+            if "confirm_generate" not in st.session_state:
+                st.session_state["confirm_generate"] = False
+            if "show_confirm" not in st.session_state:
+                st.session_state["show_confirm"]     = False
+            if "pending_assignments" not in st.session_state:
+                st.session_state["pending_assignments"] = None
+
+            # ── Balance Tracker (TOP) ─────────────────
+            st.subheader("Balance Tracker")
+
+            balance_cols = st.columns(num_analysts)
+            for i, (col, name) in enumerate(zip(balance_cols, analyst_names)):
+
+                assigned_count = 0
+                for retailer, assignment in st.session_state["retailer_assignments"].items():
+                    if assignment == name:
+                        assigned_count += retailer_counts.get(retailer, 0)
+                    elif assignment == "Split":
+                        if retailer in st.session_state["split_counts"]:
+                            assigned_count += st.session_state["split_counts"][retailer].get(name, 0)
+
+                analyst_target = target + remainder if i == 0 else target
+                remaining      = analyst_target - assigned_count
+                pct            = assigned_count / analyst_target if analyst_target > 0 else 0
+
+                if pct > 1.0:
+                    bar_color = "🔴"
+                    status    = f"Over by {assigned_count - analyst_target}"
+                elif pct >= 0.9:
+                    bar_color = "🟢"
+                    status    = "On target ✅"
+                elif pct >= 0.5:
+                    bar_color = "🟡"
+                    status    = f"{remaining} more needed"
+                else:
+                    bar_color = "🔵"
+                    status    = f"{remaining} more needed"
+
+                col.metric(
+                    label = f"{bar_color} {name}",
+                    value = f"{assigned_count} / {analyst_target}",
+                    delta = status
+                )
+                col.progress(min(pct, 1.0))
+
+            st.divider()
+
+            # ── Bulk Assign ───────────────────────────
+            st.subheader("Assign Retailers")
+
+            bulk_col1, bulk_col2, bulk_col3 = st.columns([1, 2, 2])
+
+            with bulk_col1:
+                if st.button("Select All", key="select_all"):
+                    for retailer in retailer_counts.keys():
+                        if retailer not in st.session_state["retailer_assignments"]:
+                            st.session_state[f"check_{retailer}"] = True
+
+            with bulk_col2:
+                bulk_analyst = st.selectbox(
+                    "Assign selected to",
+                    options = ["— Select —"] + analyst_names,
+                    key     = "bulk_analyst"
+                )
+
+            with bulk_col3:
+                if st.button("Assign Selected", key="bulk_assign"):
+                    if bulk_analyst != "— Select —":
+                        for retailer in retailer_counts.keys():
+                            if st.session_state.get(f"check_{retailer}", False):
+                                st.session_state["retailer_assignments"][retailer] = bulk_analyst
+                                st.session_state[f"check_{retailer}"] = False
+                        logger.info(f"Bulk assign to {bulk_analyst}")
+
+            st.divider()
+
+            # ── Unassigned Retailers ──────────────────
+            unassigned_retailers = {
+                r: c for r, c in retailer_counts.items()
+                if st.session_state["retailer_assignments"].get(r) is None
+            }
+
+            if unassigned_retailers:
+                st.markdown(f"**📋 Unassigned — {len(unassigned_retailers)} retailers**")
+                for retailer, count in unassigned_retailers.items():
+                    row_col1, row_col2, row_col3 = st.columns([1, 4, 3])
+
+                    with row_col1:
+                        st.session_state[f"check_{retailer}"] = st.checkbox(
+                            "",
+                            value = st.session_state.get(f"check_{retailer}", False),
+                            key   = f"checkbox_{retailer}"
+                        )
+
+                    row_col2.write(f"**{retailer}** — {count} ALIs")
+
+                    with row_col3:
+                        quick_assign = st.selectbox(
+                            "Quick assign",
+                            options = ["— Select —"] + analyst_names + ["Split"],
+                            key     = f"quick_{retailer}"
+                        )
+                        if quick_assign != "— Select —":
+                            st.session_state["retailer_assignments"][retailer] = quick_assign
+
+            st.divider()
+
+            # ── Assigned Retailers ────────────────────
+            assigned_retailers = {
+                r: c for r, c in retailer_counts.items()
+                if st.session_state["retailer_assignments"].get(r) is not None
+            }
+
+            if assigned_retailers:
+                st.markdown(f"**✅ Assigned — {len(assigned_retailers)} retailers**")
+                for retailer, count in assigned_retailers.items():
+                    assignment = st.session_state["retailer_assignments"][retailer]
+                    a_col1, a_col2, a_col3 = st.columns([4, 3, 2])
+                    a_col1.write(f"**{retailer}** — {count} ALIs")
+                    a_col2.write(f"→ {assignment}")
+                    if a_col3.button("↩ Unassign", key=f"unassign_{retailer}"):
+                        del st.session_state["retailer_assignments"][retailer]
+
+            st.divider()
+
+            # ── Split Section ─────────────────────────
+            split_retailers = {
+                r: c for r, c in retailer_counts.items()
+                if st.session_state["retailer_assignments"].get(r) == "Split"
+            }
+
+            if split_retailers:
+                st.subheader("Split Retailers")
+                for retailer, count in split_retailers.items():
+                    st.markdown(f"**{retailer}** — {count} ALIs")
+                    split_cols  = st.columns(num_analysts)
+                    split_input = {}
+
+                    for i, (sc, name) in enumerate(zip(split_cols, analyst_names)):
+                        already_assigned = sum(
+                            retailer_counts.get(r, 0)
+                            for r, a in st.session_state["retailer_assignments"].items()
+                            if a == name and r != retailer
+                        )
+                        analyst_target   = target + remainder if i == 0 else target
+                        remaining_needed = max(0, analyst_target - already_assigned)
+
+                        val = sc.number_input(
+                            f"{name} (needs {remaining_needed})",
+                            min_value = 0,
+                            max_value = count,
+                            value     = min(remaining_needed, count),
+                            key       = f"split_{retailer}_{name}"
+                        )
+                        split_input[name] = val
+
+                    total_split = sum(split_input.values())
+                    if total_split != count:
+                        st.warning(f"⚠️ Split total {total_split} does not match {count}. Difference: {abs(count - total_split)}")
+                    else:
+                        st.success(f"✅ Split adds up — {total_split} ALIs")
+
+                    st.session_state["split_counts"][retailer] = split_input
+                st.divider()
+
+            # ── Generate Excel ────────────────────────
+            if st.button("Generate Excel", key="multi_generate"):
+                st.session_state["confirm_generate"] = False
+                st.session_state["show_confirm"]     = False
+
+                final_assignments = {name: pd.DataFrame() for name in analyst_names}
+
+                for retailer, assignment in st.session_state["retailer_assignments"].items():
+                    retailer_df = df_launcher[df_launcher[LIST_NAME_COL] == retailer].copy()
+
+                    if assignment == "Split":
+                        if retailer in st.session_state["split_counts"]:
+                            try:
+                                split_result = random_split_retailer(
+                                    df_launcher,
+                                    retailer,
+                                    st.session_state["split_counts"][retailer]
+                                )
+                                for name, split_df in split_result.items():
+                                    final_assignments[name] = pd.concat(
+                                        [final_assignments[name], split_df],
+                                        ignore_index=True
+                                    )
+                            except ValueError as e:
+                                st.error(str(e))
+                                st.stop()
+
+                    elif assignment in analyst_names:
+                        final_assignments[assignment] = pd.concat(
+                            [final_assignments[assignment], retailer_df],
+                            ignore_index=True
+                        )
+
+                total_assigned   = sum(len(v) for v in final_assignments.values())
+                unassigned_count = total_alis - total_assigned
+
+                st.session_state["pending_assignments"] = final_assignments
+
+                if unassigned_count > 0:
+                    st.session_state["unassigned_count"] = unassigned_count
+                    st.session_state["show_confirm"]     = True
+                else:
+                    st.session_state["confirm_generate"] = True
+
+            # ── Confirmation Warning ──────────────────
+            if st.session_state.get("show_confirm"):
+                st.warning(f"⚠️ {st.session_state['unassigned_count']} ALIs are still unassigned. Do you still want to generate?")
+                if st.button("Yes, Generate Anyway", key="confirm_anyway"):
+                    st.session_state["confirm_generate"] = True
+                    st.session_state["show_confirm"]     = False
+
+            # ── Download ─────────────────────────────
+            if st.session_state.get("confirm_generate") and st.session_state["pending_assignments"] is not None:
+
+                with st.spinner("Building task list..."):
+                    sheets_dict = build_output_excel(st.session_state["pending_assignments"])
+                    from utils.file_handler import write_multi_sheet_excel
+                    from datetime import datetime
+                    filename = f"TaskList_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    output   = write_multi_sheet_excel(sheets_dict, filename)
+
+                st.success("✅ Task list ready")
+                st.download_button(
+                    label     = "📥 Download Task List",
+                    data      = output,
+                    file_name = filename,
+                    mime      = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                st.session_state["confirm_generate"]    = False
+                st.session_state["pending_assignments"] = None
+                logger.info(f"Multi mode Excel generated | {filename}")
+
+
+
+
+
+

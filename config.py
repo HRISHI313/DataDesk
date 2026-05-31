@@ -47,3 +47,21 @@ NORMAL                 = "Normal"
 COMPARISON_ALI       = "ALI"
 COMPARISON_ADDRESS   = "Address"
 COMPARISON_MIGRATION = "Migration"
+
+# Task Launcher
+LAUNCHER_OUTPUT_COLUMNS = [
+    "Date",
+    CATEGORY_COL,
+    LIST_ID_COL,
+    LIST_NAME_COL,
+    ALI_COL,
+    POLYGON_STATUS_COL,
+    STORE_NAME_COL,
+    ADDRESS_COL,
+    CITY_COL,
+    STATE_COL,
+    ZIP_COL,
+    "Source-1",
+    "Source-2",
+    "Remark"
+]
