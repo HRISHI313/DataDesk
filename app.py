@@ -8,6 +8,7 @@ from utils.validators import validate_required_columns, validate_file_not_empty
 from modules.analyser import get_full_analysis
 from modules.comparator import get_comparison_summary
 from modules.task_launcher import *
+import base64
 
 # ─── LOGGING SETUP ──────────────────────────────────
 logger = setup_logger()
@@ -16,13 +17,42 @@ logger.info("DataDesk started")
 # ─── PAGE CONFIG ────────────────────────────────────
 st.set_page_config(
     page_title = "DataDesk",
+    page_icon  = "📊",
     layout     = "wide"
 )
 
+# ─── LOAD CSS ───────────────────────────────────────
+def load_css():
+    with open("C:\\Users\\Lenovo\\OneDrive - Retailstat, LLC\\Documents\\DataDesk\\assets\\style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css() 
+
 # ─── HEADER ─────────────────────────────────────────
-st.title("DataDesk")
-st.caption("Internal Data Operations Platform")
-st.divider()
+def get_logo_base64():
+    with open("assets/logo.png", "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+try:
+    logo_b64 = get_logo_base64()
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="dd-logo"/>'
+except:
+    logo_html = ""
+
+st.markdown(f"""
+<div class="dd-header">
+    <div class="dd-header-left">
+        {logo_html}
+        <div>
+            <div class="dd-title">DataDesk</div>
+            <div class="dd-subtitle">Built for analyse your data, compare your files and launch tasks in minutes.</div>
+        </div>
+    </div>
+    <div class="dd-header-right">
+        <div class="dd-version">v{APP_VERSION}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ─── TABS ───────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs(["Analyser", "Comparator", "Task Launcher"])
