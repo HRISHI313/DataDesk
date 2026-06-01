@@ -35,9 +35,6 @@ DataDesk/
 │   ├── validators.py
 │   ├── version_checker.py
 │   └── logger.py
-├── tests/
-│   ├── sample_data/
-│   └── notebooks/
 ├── logs/
 ├── output/
 ├── assets/
