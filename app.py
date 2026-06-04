@@ -9,6 +9,7 @@ from modules.analyser import get_full_analysis
 from modules.comparator import get_comparison_summary
 from modules.task_launcher import *
 import base64
+from pathlib import Path
 
 # ─── LOGGING SETUP ──────────────────────────────────
 logger = setup_logger()
@@ -21,20 +22,25 @@ st.set_page_config(
     layout     = "wide"
 )
 
-# ─── LOAD CSS ───────────────────────────────────────
+# ─── BASE PATH ───────────────────────────────────────
+BASE_DIR = Path(__file__).parent
+CSS_PATH  = BASE_DIR / "assets" / "style.css"
+LOGO_PATH = BASE_DIR / "assets" / "logo.png"
+
+# ─── LOAD CSS ────────────────────────────────────────
 def load_css():
-    with open("C:\\Users\\Lenovo\\OneDrive - Retailstat, LLC\\Documents\\DataDesk\\assets\\style.css") as f:
+    with open(CSS_PATH, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-load_css() 
+load_css()
 
-# ─── HEADER ─────────────────────────────────────────
+# ─── HEADER ──────────────────────────────────────────
 def get_logo_base64():
-    with open("assets/logo.png", "rb") as f:
+    with open(LOGO_PATH, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
 try:
-    logo_b64 = get_logo_base64()
+    logo_b64  = get_logo_base64()
     logo_html = f'<img src="data:image/png;base64,{logo_b64}" class="dd-logo"/>'
 except:
     logo_html = ""
