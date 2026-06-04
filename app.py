@@ -17,7 +17,7 @@ logger.info("DataDesk started")
 # ─── PAGE CONFIG ────────────────────────────────────
 st.set_page_config(
     page_title = "DataDesk",
-    page_icon  = "📊",
+    page_icon  = "📍",
     layout     = "wide"
 )
 
@@ -128,15 +128,35 @@ with tab1:
 
         st.divider()
 
-        # ── Top Summary Cards ────────────────────────
-        col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
-        col1.metric("Total Records",         results["total_records"])
-        col2.metric("Unique Retailers",      results["unique_retailers_count"])
-        col3.metric("Verified QA",           results["polygon_pct"]["Verified QA"]["count"])
-        col4.metric("Duplicate ALIs",        results["duplicate_ali"]["duplicate_count"])
-        col5.metric("Unique ALIs",           results["duplicate_ali"]["unique_ali"])
-        col6.metric("Connected to Property", results["parent_ali"]["connected"]["count"])
-        col7.metric("Pending Property",      results["parent_ali"]["unknown"]["count"])
+        # ── Launch Task Button ───────────────────────
+        if results["polygon_coverage"]["pending_count"] > 0:
+            st.divider()
+            st.caption(f"📋 {results['polygon_coverage']['pending_count']} pending records ready to launch")
+            if st.button("🚀 Launch Task From Pending Records", key="launch_from_analyser"):
+                st.session_state["launcher_df"]       = results["polygon_coverage"]["pending_rows"]
+                st.session_state["launcher_from_analyser"] = True
+                st.info("✅ Pending records transferred. Go to Launcher tab to continue.")
+                logger.info(f"Pending records transferred to Launcher | {results['polygon_coverage']['pending_count']} records")
+
+        st.divider()
+
+        # ── Top Summary Cards — Row 1 ────────────────
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Total Records",    results["total_records"])
+        col2.metric("Unique Retailers", results["unique_retailers_count"])
+        col3.metric("Verified QA",      results["polygon_pct"]["Verified QA"]["count"])
+        col4.metric("Duplicate ALIs",   results["duplicate_ali"]["duplicate_count"])
+        col5.metric("Unique ALIs",      results["duplicate_ali"]["unique_ali"])
+
+        # ── Top Summary Cards — Row 2 ────────────────
+        col6, col7, col8, col9, col10 = st.columns(5)
+        col6.metric("Connected",  results["parent_ali"]["connected"]["count"])
+        col7.metric("Unlinked",   results["parent_ali"]["unknown"]["count"])
+        col8.metric("Marked",     results["polygon_coverage"]["marked_count"])
+        col9.metric("Pending",    results["polygon_coverage"]["pending_count"])
+        col10.metric("",          "")    # empty placeholder for alignment
+
+        st.divider()
 
         st.divider()
 
@@ -335,24 +355,45 @@ with tab2:
 with tab3:
     st.subheader("Task Launcher")
 
-    # ── File Upload ──────────────────────────────────
-    launcher_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls", "csv"], key="launcher_file")
+    # ── File Source ──────────────────────────────────
+    if st.session_state.get("launcher_from_analyser") and st.session_state.get("launcher_df") is not None:
+        df_launcher = st.session_state["launcher_df"]
 
-    if launcher_file:
-
-        with st.spinner("Reading file..."):
-            df_launcher = read_excel(launcher_file)
-
-        try:
-            validate_file_not_empty(df_launcher)
-            validate_required_columns(df_launcher)
-        except ValueError as e:
-            logger.error(f"Launcher validation failed: {str(e)}")
-            st.error(str(e))
-            st.stop()
-
-        st.caption(f"📄 {launcher_file.name}  |  {len(df_launcher)} rows")
+        st.success(f"📊 {len(df_launcher)} pending records loaded from Analyser")
+        if st.button("🔄 Clear and Upload Different File", key="clear_launcher"):
+            st.session_state["launcher_from_analyser"] = False
+            st.session_state["launcher_df"]            = None
+            st.rerun()
         st.divider()
+
+    else:
+        launcher_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls", "csv"], key="launcher_file")
+
+        if launcher_file:
+            with st.spinner("Reading file..."):
+                df_launcher = read_excel(launcher_file)
+
+            try:
+                validate_file_not_empty(df_launcher)
+                validate_required_columns(df_launcher)
+            except ValueError as e:
+                logger.error(f"Launcher validation failed: {str(e)}")
+                st.error(str(e))
+                st.stop()
+
+            st.caption(f"📄 {launcher_file.name}  |  {len(df_launcher)} rows")
+            st.divider()
+
+        else:
+            df_launcher = None
+
+    # ── Only proceed if df_launcher exists ───────────
+    if df_launcher is not None:
+
+        # ── Detect Mode ──────────────────────────────
+        mode            = detect_retailer_mode(df_launcher)
+        retailer_counts = get_retailer_counts(df_launcher)
+        total_alis      = len(df_launcher)
 
         # ── Detect Mode ──────────────────────────────
         mode            = detect_retailer_mode(df_launcher)
@@ -394,14 +435,21 @@ with tab3:
 
             st.divider()
 
+            task_name = st.text_input(
+                "Task Name",
+                placeholder = "e.g. Five Below June 2026",
+                key         = "single_task_name"
+            )
+
             if st.button("Generate Excel", key="single_generate"):
                 with st.spinner("Building task list..."):
                     assignments = equal_split(df_launcher, analyst_names)
                     sheets_dict = build_output_excel(assignments)
                     from utils.file_handler import write_multi_sheet_excel
                     from datetime import datetime
-                    filename = f"TaskList_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                    output   = write_multi_sheet_excel(sheets_dict, filename)
+                    clean_name = task_name.strip().replace(" ", "_") if task_name else "TaskList"
+                    filename   = f"{clean_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    output     = write_multi_sheet_excel(sheets_dict, filename)
 
                 st.success("✅ Task list ready")
                 st.download_button(
@@ -639,14 +687,21 @@ with tab3:
                     st.session_state["show_confirm"]     = False
 
             # ── Download ─────────────────────────────
+            task_name = st.text_input(
+                "Task Name",
+                placeholder = "e.g. Five Below June 2026",
+                key         = "multi_task_name"
+            )
+
             if st.session_state.get("confirm_generate") and st.session_state["pending_assignments"] is not None:
 
                 with st.spinner("Building task list..."):
                     sheets_dict = build_output_excel(st.session_state["pending_assignments"])
                     from utils.file_handler import write_multi_sheet_excel
                     from datetime import datetime
-                    filename = f"TaskList_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                    output   = write_multi_sheet_excel(sheets_dict, filename)
+                    clean_name = task_name.strip().replace(" ", "_") if task_name else "TaskList"
+                    filename   = f"{clean_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                    output     = write_multi_sheet_excel(sheets_dict, filename)
 
                 st.success("✅ Task list ready")
                 st.download_button(

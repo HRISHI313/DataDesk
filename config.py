@@ -37,11 +37,11 @@ HIDE_TRAFFIC_FOR_COL   = "hideTrafficFor"
 CONSTRUCTION_FLAG_COL  = "constructionFlag"
 
 # TAG VALUES — keep original casing as these are data values not column names
-CONSTRUCTION           = "Construction"
-MALL_TENANT            = "Mall Tenant"
-MULTI_LEVEL            = "Multi Level"
-VERIFIED_QA            = "Verified QA"
-NORMAL                 = "Normal"
+CONSTRUCTION = "Construction"
+MALL_TENANT  = "Mall Tenant"
+MULTI_LEVEL  = "Multi-Level"
+VERIFIED_QA  = "VerifiedQA"
+NORMAL       = "Normal"
 
 # Comparison Types
 COMPARISON_ALI       = "ALI"

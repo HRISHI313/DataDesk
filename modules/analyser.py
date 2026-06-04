@@ -192,59 +192,86 @@ def polygon_coverage(dataframe):
     df    = dataframe.copy()
     total = len(df)
 
-    df[CONSTRUCTION_FLAG_COL] = df[CONSTRUCTION_FLAG_COL].fillna(NORMAL)
+    # normalize — treat Draft and empty as not done
+    df[POLYGON_STATUS_COL]     = df[POLYGON_STATUS_COL].fillna("None")
+    df[CONSTRUCTION_FLAG_COL]  = df[CONSTRUCTION_FLAG_COL].fillna(NORMAL)
 
-    # ── Marked ──────────────────────────────────────
-    mall_tenant_rows  = df[df[CONSTRUCTION_FLAG_COL] == MALL_TENANT]
-    multi_level_rows  = df[df[CONSTRUCTION_FLAG_COL] == MULTI_LEVEL]
-    polygon_done_rows = df[
-        (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
-        (df[POLYGON_STATUS_COL].notna())
+    # ── MARKED ──────────────────────────────────────
+    # Filter 1 — Polygon Status verified
+    filter1_marked = df[
+        df[POLYGON_STATUS_COL].isin([VERIFIED_QA, "VerifiedAdmin"])
     ]
 
-    # ── Pending ──────────────────────────────────────
-    construction_rows   = df[df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION]
-    polygon_missing_rows = df[
-        (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
-        (df[POLYGON_STATUS_COL].isna())
+    # Filter 2 — constructionFlag = Mall Tenant or Multi Level
+    filter2_marked = df[
+        df[CONSTRUCTION_FLAG_COL].isin([MALL_TENANT, MULTI_LEVEL])
     ]
 
-    # ── Counts ───────────────────────────────────────
-    marked_count  = len(mall_tenant_rows) + len(multi_level_rows) + len(polygon_done_rows)
-    pending_count = len(construction_rows) + len(polygon_missing_rows)
+    marked_count = len(filter1_marked) + len(filter2_marked)
+
+    # ── PENDING ──────────────────────────────────────
+    # Both conditions must be true simultaneously
+    pending_rows = df[
+        (df[POLYGON_STATUS_COL].isin(["None", "Draft"])) &
+        (df[CONSTRUCTION_FLAG_COL].isin([NORMAL, CONSTRUCTION]))
+    ]
+
+    pending_count = len(pending_rows)
+
+    # ── VIEW BREAKDOWN ───────────────────────────────
+    # Polygon Done
+    polygon_done_count = len(filter1_marked)
+
+    # Polygon Missing — Normal or Construction + no polygon
+    polygon_missing_count = len(df[
+        (df[POLYGON_STATUS_COL].isin(["None", "Draft"])) &
+        (df[CONSTRUCTION_FLAG_COL].isin([NORMAL, CONSTRUCTION]))
+    ])
+
+    # Mall Tenant count
+    mall_tenant_count = len(df[df[CONSTRUCTION_FLAG_COL] == MALL_TENANT])
+
+    # Multi Level count
+    multi_level_count = len(df[df[CONSTRUCTION_FLAG_COL] == MULTI_LEVEL])
+
+    # Construction count
+    construction_count = len(df[df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION])
 
     result = {
-        "total"                : total,
-        "marked_count"         : marked_count,
-        "marked_pct"           : round(marked_count / total * 100, 1),
-        "pending_count"        : pending_count,
-        "pending_pct"          : round(pending_count / total * 100, 1),
-        "mall_tenant_count"    : len(mall_tenant_rows),
-        "multi_level_count"    : len(multi_level_rows),
-        "polygon_done_count"   : len(polygon_done_rows),
-        "construction_count"   : len(construction_rows),
-        "polygon_missing_count": len(polygon_missing_rows)
+        "total"                 : total,
+        "marked_count"          : marked_count,
+        "marked_pct"            : round(marked_count / total * 100, 1),
+        "pending_count"         : pending_count,
+        "pending_pct"           : round(pending_count / total * 100, 1),
+        "polygon_done_count"    : polygon_done_count,
+        "polygon_missing_count" : polygon_missing_count,
+        "mall_tenant_count"     : mall_tenant_count,
+        "multi_level_count"     : multi_level_count,
+        "construction_count"    : construction_count,
+        "pending_rows"          : pending_rows    # ← add this line
     }
-
     logger.info(f"polygon_coverage() | marked: {marked_count} | pending: {pending_count}")
     return result
 
 
 def get_full_analysis(dataframe):
     logger.info("get_full_analysis() started")
+
+    polygon_cov = polygon_coverage(dataframe)    # ← call once, store result
+
     result = {
-        "total_records"             : total_record(dataframe),
-        "unique_retailers"          : total_unique_retailers(dataframe),
-        "unique_retailers_count"    : total_unique_retailers_count(dataframe),
-        "per_retailer"              : records_per_retailer(dataframe),
-        "construction_flag"         : construction_flag_breakdown(dataframe),
-        "construction_pct"          : construction_flag_percentages(dataframe),
-        "polygon_status"            : polygon_status_breakdown(dataframe),
-        "polygon_pct"               : polygon_status_percentages(dataframe),
-        "polygon_coverage"          : polygon_coverage(dataframe),
-        "duplicate_ali"             : duplicate_ali_analysis(dataframe),
-        "parent_ali"                : parent_ali_percentages(dataframe),
-        "qc_errors"                 : qc_error_check(dataframe)
+        "total_records"          : total_record(dataframe),
+        "unique_retailers"       : total_unique_retailers(dataframe),
+        "unique_retailers_count" : total_unique_retailers_count(dataframe),
+        "per_retailer"           : records_per_retailer(dataframe),
+        "construction_flag"      : construction_flag_breakdown(dataframe),
+        "construction_pct"       : construction_flag_percentages(dataframe),
+        "polygon_status"         : polygon_status_breakdown(dataframe),
+        "polygon_pct"            : polygon_status_percentages(dataframe),
+        "duplicate_ali"          : duplicate_ali_analysis(dataframe),
+        "parent_ali"             : parent_ali_percentages(dataframe),
+        "qc_errors"              : qc_error_check(dataframe),
+        "polygon_coverage"       : polygon_cov         
     }
     logger.info("get_full_analysis() complete")
     return result
