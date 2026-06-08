@@ -135,14 +135,40 @@ with tab1:
         st.divider()
 
         # ── Launch Task Button ───────────────────────
-        if results["polygon_coverage"]["pending_count"] > 0:
+        pending_count  = results["polygon_coverage"]["pending_count"]
+        qc_error_count = results["qc_errors"]["total_errors"]
+        total_to_launch = pending_count + qc_error_count
+
+        if total_to_launch > 0:
             st.divider()
-            st.caption(f"📋 {results['polygon_coverage']['pending_count']} pending records ready to launch")
-            if st.button("🚀 Launch Task From Pending Records", key="launch_from_analyser"):
-                st.session_state["launcher_df"]       = results["polygon_coverage"]["pending_rows"]
+
+            # build combined dataframe
+            import pandas as pd
+            frames = []
+
+            if pending_count > 0:
+                frames.append(results["polygon_coverage"]["pending_rows"])
+
+            if qc_error_count > 0:
+                frames.append(results["qc_errors"]["mall_tenant_errors"])
+                frames.append(results["qc_errors"]["multi_level_errors"])
+                frames.append(results["qc_errors"]["construction_errors"])
+
+            combined_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+            # show summary
+            if pending_count > 0 and qc_error_count > 0:
+                st.caption(f"📋 {pending_count} pending + {qc_error_count} QC error records ready to launch — {total_to_launch} total")
+            elif pending_count > 0:
+                st.caption(f"📋 {pending_count} pending records ready to launch")
+            else:
+                st.caption(f"📋 {qc_error_count} QC error records ready to launch")
+
+            if st.button("🚀 Launch Task", key="launch_from_analyser"):
+                st.session_state["launcher_df"]            = combined_df
                 st.session_state["launcher_from_analyser"] = True
-                st.info("✅ Pending records transferred. Go to Launcher tab to continue.")
-                logger.info(f"Pending records transferred to Launcher | {results['polygon_coverage']['pending_count']} records")
+                st.info(f"✅ {total_to_launch} records transferred. Go to Launcher tab to continue.")
+                logger.info(f"Records transferred to Launcher | pending: {pending_count} | qc_errors: {qc_error_count} | total: {total_to_launch}")
 
         st.divider()
 
@@ -162,7 +188,6 @@ with tab1:
         col9.metric("Pending",    results["polygon_coverage"]["pending_count"])
         col10.metric("",          "")    # empty placeholder for alignment
 
-        st.divider()
 
         st.divider()
 
