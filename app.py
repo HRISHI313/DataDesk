@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
 import logging
+import altair as alt
+import os
+import pickle
 from utils.logger import setup_logger
 from config import *
 from utils.file_handler import read_excel
-from utils.validators import validate_required_columns, validate_file_not_empty
+from utils.validators import validate_required_columns, validate_file_not_empty, check_required_columns
 from modules.analyser import get_full_analysis
 from modules.comparator import get_comparison_summary
 from modules.task_launcher import *
@@ -60,6 +63,160 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ─── SIDEBAR & SETTINGS ──────────────────────────────
+with st.sidebar:
+    st.markdown("## ⚙️ Settings & Presets")
+    
+    # Analyst Presets
+    analyst_preset_str = st.text_input(
+        "Analyst Presets (comma-separated)",
+        value="Analyst 1, Analyst 2",
+        help="Default names to populate task launcher sheets."
+    )
+    preset_names = [name.strip() for name in analyst_preset_str.split(",") if name.strip()]
+    
+    st.divider()
+    st.markdown("### 📁 Log Management")
+    
+    # Count current logs
+    log_files_count = 0
+    if os.path.exists("logs"):
+        log_files_count = len([f for f in os.listdir("logs") if f.startswith("datadesk_") and f.endswith(".txt")])
+        
+    st.write(f"Active session logs: **{log_files_count}**")
+    
+    if st.button("🧹 Clear Logs Manually", key="clear_logs_manual_btn"):
+        if os.path.exists("logs"):
+            cleared = 0
+            for f in os.listdir("logs"):
+                if f.startswith("datadesk_") and f.endswith(".txt"):
+                    try:
+                        os.remove(os.path.join("logs", f))
+                        cleared += 1
+                    except Exception:
+                        pass
+            st.success(f"Cleared {cleared} logs!")
+            st.rerun()
+
+    st.divider()
+    st.markdown("### 💾 Session Persistence")
+    
+    if os.path.exists("data/temp/last_session_state.pkl"):
+        st.info("Saved session data found.")
+        col_rest, col_clear = st.columns(2)
+        with col_rest:
+            if st.button("🔄 Restore", help="Reload the files and assignments from your previous run.", key="restore_session_btn"):
+                if load_session_state():
+                    st.success("Session restored!")
+                    st.rerun()
+        with col_clear:
+            if st.button("❌ Clear", help="Delete the session backup file.", key="clear_session_btn"):
+                if os.path.exists("data/temp/last_session_state.pkl"):
+                    os.remove("data/temp/last_session_state.pkl")
+                keys_to_clear = [
+                    "mapped_df_analyser", "last_uploaded_file_name_analyser",
+                    "mapped_df_launcher", "last_uploaded_file_name_launcher",
+                    "launcher_df", "launcher_from_analyser",
+                    "retailer_assignments", "split_counts",
+                    "confirm_generate", "show_confirm",
+                    "pending_assignments", "unassigned_count"
+                ]
+                for k in keys_to_clear:
+                    if k in st.session_state:
+                        del st.session_state[k]
+                st.success("Cleared!")
+                st.rerun()
+    else:
+        st.caption("No session backup found.")
+
+def handle_column_mapping(df, key_prefix):
+    # if we have a stored mapped dataframe, use it
+    if f"mapped_df_{key_prefix}" in st.session_state:
+        df = st.session_state[f"mapped_df_{key_prefix}"]
+
+    missing_cols = check_required_columns(df)
+    if not missing_cols:
+        return df, True
+
+    st.warning(f"⚠️ Some required columns are missing in the uploaded file for {key_prefix.capitalize()}. Please map your columns:")
+    
+    # We will map each missing required column to one of the columns in the df
+    available_cols = ["-- Select Column --"] + [str(c) for c in df.columns]
+    
+    # Store mappings in a dict
+    mappings = {}
+    
+    # Render mapping dropdowns in columns
+    cols_to_render = st.columns(min(len(missing_cols), 3))
+    
+    for idx, req_col in enumerate(missing_cols):
+        col_container = cols_to_render[idx % len(cols_to_render)]
+        
+        # Auto-suggest match: find column in df.columns that is similar
+        suggested_idx = 0
+        req_col_lower = req_col.lower().replace(" ", "").replace("_", "").replace("-", "")
+        for aidx, avail_col in enumerate(df.columns):
+            avail_col_lower = str(avail_col).lower().replace(" ", "").replace("_", "").replace("-", "")
+            if req_col_lower == avail_col_lower:
+                suggested_idx = aidx + 1
+                break
+        
+        mapped = col_container.selectbox(
+            f"Map '{req_col}' to:",
+            options=available_cols,
+            index=suggested_idx,
+            key=f"map_{key_prefix}_{req_col}"
+        )
+        if mapped != "-- Select Column --":
+            mappings[mapped] = req_col
+            
+    # Add a confirm mapping button
+    if st.button("Confirm Column Mapping", key=f"confirm_map_btn_{key_prefix}"):
+        if len(mappings) < len(missing_cols):
+            st.error("Please map all missing required columns.")
+            return df, False
+        else:
+            # Rename columns
+            df_mapped = df.rename(columns=mappings)
+            st.session_state[f"mapped_df_{key_prefix}"] = df_mapped
+            st.success("Columns mapped successfully!")
+            st.rerun()
+            
+    return df, False
+
+def save_session_state():
+    state_to_save = {}
+    keys_to_save = [
+        "mapped_df_analyser", "last_uploaded_file_name_analyser",
+        "mapped_df_launcher", "last_uploaded_file_name_launcher",
+        "launcher_df", "launcher_from_analyser",
+        "retailer_assignments", "split_counts",
+        "confirm_generate", "show_confirm",
+        "pending_assignments", "unassigned_count"
+    ]
+    for key in keys_to_save:
+        if key in st.session_state:
+            state_to_save[key] = st.session_state[key]
+            
+    os.makedirs("data/temp", exist_ok=True)
+    try:
+        with open("data/temp/last_session_state.pkl", "wb") as f:
+            pickle.dump(state_to_save, f)
+    except Exception as e:
+        logger.error(f"Failed to save session state: {str(e)}")
+
+def load_session_state():
+    try:
+        if os.path.exists("data/temp/last_session_state.pkl"):
+            with open("data/temp/last_session_state.pkl", "rb") as f:
+                state = pickle.load(f)
+            for k, v in state.items():
+                st.session_state[k] = v
+            return True
+    except Exception as e:
+        logger.error(f"Failed to load session state: {str(e)}")
+    return False
+
 # ─── TABS ───────────────────────────────────────────
 tab1, tab2, tab3 = st.tabs(["Analyser", "Comparator", "Task Launcher"])
 
@@ -71,6 +228,12 @@ with tab1:
 
     if uploaded_file:
 
+        # ── Detect file change to clear mapping state ────
+        if st.session_state.get("last_uploaded_file_name_analyser") != uploaded_file.name:
+            st.session_state["last_uploaded_file_name_analyser"] = uploaded_file.name
+            if "mapped_df_analyser" in st.session_state:
+                del st.session_state["mapped_df_analyser"]
+
         # ── File Info Bar ────────────────────────────
         with st.spinner("Reading file..."):
             start_time = pd.Timestamp.now()
@@ -79,9 +242,12 @@ with tab1:
 
         try:
             validate_file_not_empty(df)
-            validate_required_columns(df)
         except ValueError as e:
             st.error(str(e))
+            st.stop()
+
+        df, col_mapping_ok = handle_column_mapping(df, key_prefix="analyser")
+        if not col_mapping_ok:
             st.stop()
 
         st.caption(f"📄 {uploaded_file.name}  |  {len(df)} rows  |  loaded in {elapsed}s")
@@ -110,17 +276,37 @@ with tab1:
         # ── Polygon Coverage ─────────────────────────
         st.subheader("Polygon Coverage")
 
-        marked_pct    = results["polygon_coverage"]["marked_pct"]
-        pending_pct   = results["polygon_coverage"]["pending_pct"]
-        marked_count  = results["polygon_coverage"]["marked_count"]
-        pending_count = results["polygon_coverage"]["pending_count"]
-        total         = results["polygon_coverage"]["total"]
+        pc_col1, pc_col2 = st.columns([1, 1])
 
-        st.caption(f"Marked — {marked_count} of {total} records ({marked_pct}%)")
-        st.progress(marked_pct / 100)
+        with pc_col1:
+            marked_pct    = results["polygon_coverage"]["marked_pct"]
+            pending_pct   = results["polygon_coverage"]["pending_pct"]
+            marked_count  = results["polygon_coverage"]["marked_count"]
+            pending_count = results["polygon_coverage"]["pending_count"]
+            total         = results["polygon_coverage"]["total"]
 
-        st.caption(f"Pending — {pending_count} of {total} records ({pending_pct}%)")
-        st.progress(pending_pct / 100)
+            st.caption(f"Marked — {marked_count} of {total} records ({marked_pct}%)")
+            st.progress(marked_pct / 100)
+
+            st.caption(f"Pending — {pending_count} of {total} records ({pending_pct}%)")
+            st.progress(pending_pct / 100)
+
+        with pc_col2:
+            # Create a donut chart using Altair
+            donut_df = pd.DataFrame({
+                "Status": ["Marked", "Pending"],
+                "Count": [marked_count, pending_count]
+            })
+            donut_chart = alt.Chart(donut_df).mark_arc(innerRadius=45).encode(
+                theta=alt.Theta(field="Count", type="quantitative"),
+                color=alt.Color(field="Status", type="nominal", scale=alt.Scale(domain=["Marked", "Pending"], range=["#2ecc71", "#e74c3c"])),
+                tooltip=["Status", "Count"]
+            ).properties(
+                height=180
+            ).configure_legend(
+                orient="right"
+            )
+            st.altair_chart(donut_chart, use_container_width=True)
 
         st.divider()
 
@@ -205,16 +391,32 @@ with tab1:
 
         # ── Per Retailer Table ───────────────────────
         st.subheader("Records Per Retailer")
-        st.dataframe(results["per_retailer"], use_container_width=True)
+        pr_col1, pr_col2 = st.columns([1, 1])
+        with pr_col1:
+            st.bar_chart(
+                results["per_retailer"],
+                x="Retailer",
+                y="Record Count"
+            )
+        with pr_col2:
+            st.dataframe(results["per_retailer"], use_container_width=True)
 
         st.divider()
 
         # ── Parent ALI Breakdown Table ───────────────
-        st.subheader("Parent ALI")
-        st.dataframe(
-            results["parent_ali"]["per_retailer"],
-            use_container_width=True
-        )
+        st.subheader("Parent ALI Connection by Retailer")
+        pa_col1, pa_col2 = st.columns([1, 1])
+        with pa_col1:
+            st.bar_chart(
+                results["parent_ali"]["per_retailer"],
+                x=LIST_NAME_COL,
+                y=["Connected", "Unknown"]
+            )
+        with pa_col2:
+            st.dataframe(
+                results["parent_ali"]["per_retailer"],
+                use_container_width=True
+            )
 
         st.divider()
 
@@ -401,15 +603,24 @@ with tab3:
         launcher_file = st.file_uploader("Upload Excel File", type=["xlsx", "xls", "csv"], key="launcher_file")
 
         if launcher_file:
+            # ── Detect file change to clear mapping state ────
+            if st.session_state.get("last_uploaded_file_name_launcher") != launcher_file.name:
+                st.session_state["last_uploaded_file_name_launcher"] = launcher_file.name
+                if "mapped_df_launcher" in st.session_state:
+                    del st.session_state["mapped_df_launcher"]
+
             with st.spinner("Reading file..."):
                 df_launcher = read_excel(launcher_file)
 
             try:
                 validate_file_not_empty(df_launcher)
-                validate_required_columns(df_launcher)
             except ValueError as e:
                 logger.error(f"Launcher validation failed: {str(e)}")
                 st.error(str(e))
+                st.stop()
+
+            df_launcher, col_mapping_ok = handle_column_mapping(df_launcher, key_prefix="launcher")
+            if not col_mapping_ok:
                 st.stop()
 
             st.caption(f"📄 {launcher_file.name}  |  {len(df_launcher)} rows")
@@ -440,12 +651,14 @@ with tab3:
 
         # ── Analyst Setup ────────────────────────────
         st.subheader("Analyst Setup")
-        num_analysts = st.number_input("Number of Analysts", min_value=1, max_value=20, value=2, step=1)
+        default_num = len(preset_names) if len(preset_names) > 0 else 2
+        num_analysts = st.number_input("Number of Analysts", min_value=1, max_value=20, value=default_num, step=1)
 
         analyst_names = []
         name_cols     = st.columns(num_analysts)
         for i, col in enumerate(name_cols):
-            name = col.text_input(f"Analyst {i+1} Name", value=f"Analyst {i+1}", key=f"analyst_name_{i}")
+            default_name = preset_names[i] if i < len(preset_names) else f"Analyst {i+1}"
+            name = col.text_input(f"Analyst {i+1} Name", value=default_name, key=f"analyst_name_{i}")
             analyst_names.append(name)
 
         target, remainder = calculate_target(total_alis, num_analysts)
@@ -744,6 +957,9 @@ with tab3:
                 st.session_state["confirm_generate"]    = False
                 st.session_state["pending_assignments"] = None
                 logger.info(f"Multi mode Excel generated | {filename}")
+
+# ─── AUTO-SAVE STATE ────────────────────────────────
+save_session_state()
 
 
 

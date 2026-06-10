@@ -34,3 +34,7 @@ def validate_required_columns(df):
         raise ValueError(f"Missing required columns: {missing}")
     logger.info("All required columns present")
     return True
+
+def check_required_columns(df):
+    logger.info("Checking required columns")
+    return [col for col in REQUIRED_COLUMNS if col not in df.columns]

@@ -110,6 +110,36 @@ def build_output_excel(assignments):
 
     sheets_dict = {}
 
+    # 1. Create Summary Sheet
+    total_assigned = sum(len(df) for df in assignments.values())
+    summary_rows = []
+    for analyst_name, analyst_df in assignments.items():
+        count = len(analyst_df)
+        pct = round(count / total_assigned * 100, 1) if total_assigned > 0 else 0.0
+        
+        # Get unique retailers
+        if LIST_NAME_COL in analyst_df.columns and not analyst_df.empty:
+            retailers = ", ".join(map(str, analyst_df[LIST_NAME_COL].unique()))
+        else:
+            retailers = ""
+            
+        summary_rows.append({
+            "Analyst Name": analyst_name,
+            "Tasks Assigned": count,
+            "Percentage (%)": f"{pct}%",
+            "Assigned Retailers": retailers
+        })
+        
+    summary_rows.append({
+        "Analyst Name": "Total",
+        "Tasks Assigned": total_assigned,
+        "Percentage (%)": "100.0%",
+        "Assigned Retailers": ""
+    })
+    
+    sheets_dict["Summary"] = pd.DataFrame(summary_rows)
+
+    # 2. Create Analyst Sheets
     for analyst_name, analyst_df in assignments.items():
         logger.info(f"build_output_excel() | building sheet: {analyst_name} | {len(analyst_df)} records")
 
