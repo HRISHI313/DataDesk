@@ -1,0 +1,72 @@
+.upload-step {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.upload-step h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #111827;
+}
+
+.upload-hint {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.upload-step input[type="file"] {
+  font-size: 14px;
+}
+
+.upload-step button {
+  align-self: flex-start;
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-step button:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.upload-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.mapping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.mapping-required {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.mapping-row select {
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}

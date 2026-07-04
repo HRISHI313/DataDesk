@@ -1,0 +1,82 @@
+.balance-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.balance-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.balance-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.balance-name {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.balance-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.balance-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.balance-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.balance-status-label {
+  font-size: 12px;
+  font-weight: 500;
+  align-self: flex-end;
+}
+
+.status-filling {
+  color: #2563eb;
+}
+.balance-bar-fill.status-filling {
+  background: #3b82f6;
+}
+
+.status-near {
+  color: #b45309;
+}
+.balance-bar-fill.status-near {
+  background: #f59e0b;
+}
+
+.status-onTarget {
+  color: #15803d;
+}
+.balance-bar-fill.status-onTarget {
+  background: #22c55e;
+}
+
+.status-over {
+  color: #b91c1c;
+}
+.balance-bar-fill.status-over {
+  background: #ef4444;
+}
+
+.status-neutral {
+  color: #6b7280;
+}
+.balance-bar-fill.status-neutral {
+  background: #9ca3af;
+}

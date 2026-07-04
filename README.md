@@ -132,14 +132,6 @@ Current version: 1.0
 
 ---
 
-## Project Rules
-1. Never change code that affects another tab's output or logic unless explicitly discussed
-2. config.py is frozen — no changes without assessing impact across all modules first
-3. All manipulation happens in modules/ — app.py handles UI only
-4. Test in Jupyter notebooks before moving logic to production files
-
----
-
 ## Version 2 Backlog
 - User Workload Summary in Analyser
 - Date Effective Analysis in Analyser

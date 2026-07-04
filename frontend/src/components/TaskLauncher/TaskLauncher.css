@@ -1,0 +1,63 @@
+.task-launcher {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 32px 60px;
+}
+
+.task-launcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+}
+
+.task-launcher-header h1 {
+  font-size: 22px;
+  margin: 0;
+  color: #111827;
+}
+
+.start-over-btn {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+
+.done-panel {
+  max-width: 420px;
+  margin: 60px auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.done-panel h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #15803d;
+}
+
+.done-panel p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.done-panel button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
