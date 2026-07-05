@@ -1,63 +1,71 @@
 .task-launcher {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 32px 60px;
+  padding: 28px 36px 60px;
 }
 
 .task-launcher-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
 }
 
 .task-launcher-header h1 {
-  font-size: 22px;
+  font-size: 20px;
   margin: 0;
-  color: #111827;
 }
 
 .start-over-btn {
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: white;
-  color: #374151;
+  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
   cursor: pointer;
+}
+
+.start-over-btn:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
 }
 
 .done-panel {
   max-width: 420px;
-  margin: 60px auto;
+  margin: 80px auto;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
 }
 
 .done-panel h2 {
   margin: 0;
-  font-size: 20px;
-  color: #15803d;
+  font-size: 19px;
+  color: var(--verified);
 }
 
 .done-panel p {
   margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+  color: var(--text-dim);
+  font-size: 13.5px;
 }
 
 .done-panel button {
-  background: #2563eb;
+  background: var(--accent);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 14px;
+  padding: 10px 22px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.done-panel button:hover {
+  background: #3d7bef;
 }

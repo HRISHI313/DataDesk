@@ -1,22 +1,24 @@
 .single-assign {
   max-width: 480px;
   margin: 0 auto;
-  padding: 32px 0;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .single-assign h2 {
   margin: 0;
-  font-size: 20px;
-  color: #111827;
+  font-size: 18px;
 }
 
 .single-assign-hint {
-  margin: 0;
-  font-size: 14px;
-  color: #6b7280;
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .single-assign .analyst-manager {
@@ -30,18 +32,19 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--surface-raised);
+  color: var(--accent);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 4px 6px 4px 12px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
 .single-assign .analyst-chip button {
   background: none;
   border: none;
-  color: #1d4ed8;
+  color: var(--accent);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
@@ -50,60 +53,68 @@
 
 .single-assign .analyst-manager input {
   font-size: 13px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .single-assign .analyst-manager button {
   font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: none;
-  background: #111827;
-  color: white;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
   cursor: pointer;
 }
 
 .single-assign .target-line {
   margin: 0;
-  font-size: 14px;
-  color: #374151;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
 }
 
 .single-assign .task-name-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #4b5563;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-dim);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .single-assign .task-name-label input {
-  font-size: 14px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
   font-weight: 400;
+  text-transform: none;
 }
 
 .single-assign .assign-error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 13px;
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid rgba(255, 92, 92, 0.3);
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
 }
 
 .single-assign .generate-btn {
-  background: #16a34a;
-  color: white;
+  background: var(--verified);
+  color: #0c1210;
   border: none;
   padding: 12px;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   align-self: flex-start;
@@ -111,7 +122,11 @@
   padding-right: 24px;
 }
 
+.single-assign .generate-btn:hover:not(:disabled) {
+  background: #3fd691;
+}
+
 .single-assign .generate-btn:disabled {
-  background: #86efac;
+  opacity: 0.4;
   cursor: not-allowed;
 }

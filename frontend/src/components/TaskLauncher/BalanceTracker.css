@@ -1,36 +1,38 @@
 .balance-tracker {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .balance-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .balance-row-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .balance-name {
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text);
 }
 
 .balance-count {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
 }
 
 .balance-bar-track {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: var(--surface-raised);
   overflow: hidden;
 }
 
@@ -41,42 +43,44 @@
 }
 
 .balance-status-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   align-self: flex-end;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .status-filling {
-  color: #2563eb;
+  color: var(--accent);
 }
 .balance-bar-fill.status-filling {
-  background: #3b82f6;
+  background: var(--accent);
 }
 
 .status-near {
-  color: #b45309;
+  color: var(--pending);
 }
 .balance-bar-fill.status-near {
-  background: #f59e0b;
+  background: var(--pending);
 }
 
 .status-onTarget {
-  color: #15803d;
+  color: var(--verified);
 }
 .balance-bar-fill.status-onTarget {
-  background: #22c55e;
+  background: var(--verified);
 }
 
 .status-over {
-  color: #b91c1c;
+  color: var(--error);
 }
 .balance-bar-fill.status-over {
-  background: #ef4444;
+  background: var(--error);
 }
 
 .status-neutral {
-  color: #6b7280;
+  color: var(--text-faint);
 }
 .balance-bar-fill.status-neutral {
-  background: #9ca3af;
+  background: var(--text-faint);
 }

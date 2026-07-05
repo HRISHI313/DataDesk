@@ -8,23 +8,33 @@ function App() {
 
   return (
     <div className="app-shell">
-      <nav className="app-tabs">
-        <button
-          className={tab === "analyser" ? "app-tab active" : "app-tab"}
-          onClick={() => setTab("analyser")}
-        >
-          Analyser
-        </button>
-        <button
-          className={tab === "task-launcher" ? "app-tab active" : "app-tab"}
-          onClick={() => setTab("task-launcher")}
-        >
-          Task Launcher
-        </button>
-      </nav>
+      <aside className="app-sidebar">
+        <div className="app-wordmark">
+          <span className="wordmark-dot" />
+          DataDesk
+        </div>
+        <nav className="app-nav">
+          <button
+            className={tab === "analyser" ? "app-nav-item active" : "app-nav-item"}
+            onClick={() => setTab("analyser")}
+          >
+            <span className="status-dot verified" />
+            Analyser
+          </button>
+          <button
+            className={tab === "task-launcher" ? "app-nav-item active" : "app-nav-item"}
+            onClick={() => setTab("task-launcher")}
+          >
+            <span className="status-dot pending" />
+            Task Launcher
+          </button>
+        </nav>
+      </aside>
 
-      {tab === "analyser" && <Analyser />}
-      {tab === "task-launcher" && <TaskLauncher />}
+      <main className="app-main">
+        {tab === "analyser" && <Analyser />}
+        {tab === "task-launcher" && <TaskLauncher />}
+      </main>
     </div>
   );
 }

@@ -1,26 +1,32 @@
 .pct-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .pct-row-header {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
-  color: #374151;
-  margin-bottom: 4px;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.pct-row-header span:last-child {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-size: 12px;
 }
 
 .pct-bar-track {
-  height: 7px;
+  height: 6px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: var(--surface-raised);
   overflow: hidden;
 }
 
 .pct-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--accent);
 }

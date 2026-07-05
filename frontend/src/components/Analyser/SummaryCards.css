@@ -7,32 +7,35 @@
 .summary-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 16px;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
 }
 
 .summary-value {
+  font-family: var(--font-mono);
   font-size: 26px;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 500;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
 .summary-value.tone-good {
-  color: #15803d;
+  color: var(--verified);
 }
 
 .summary-value.tone-warn {
-  color: #b45309;
+  color: var(--pending);
 }
 
 .summary-label {
-  font-size: 12.5px;
-  color: #6b7280;
+  font-size: 11.5px;
+  color: var(--text-dim);
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 @media (max-width: 900px) {
