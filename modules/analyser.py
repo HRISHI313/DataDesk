@@ -167,9 +167,22 @@ def qc_error_check(dataframe):
         (df[POLYGON_STATUS_COL].notna())
     ]
 
+    # Construction errors — broadened (was: Polygon Status notna() only).
+    # A Construction record is contradictory if EITHER:
+    #   - it already has a Polygon Status set (old check), OR
+    #   - its Geo Accuracy is already a verified-rooftop value, meaning an
+    #     analyst has manually pinned the exact location - which shouldn't
+    #     happen for a site still under construction, even if Polygon
+    #     Status hasn't been officially set yet.
+    # NOTE: this is a judgment call folding the new rooftop-contradiction
+    # case into the existing construction_errors bucket rather than adding
+    # a 4th separate QC category - flag if you'd rather split it out.
     construction_errors = df[
         (df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION) &
-        (df[POLYGON_STATUS_COL].notna())
+        (
+            (df[POLYGON_STATUS_COL].notna()) |
+            (df[GEO_ACCURACY_COL].isin(GEO_ACCURACY_VERIFIED_VALUES))
+        )
     ]
 
     total_errors = (
@@ -197,23 +210,55 @@ def polygon_coverage(dataframe):
     df[CONSTRUCTION_FLAG_COL]  = df[CONSTRUCTION_FLAG_COL].fillna(NORMAL)
 
     # ── MARKED ──────────────────────────────────────
-    # Filter 1 — Polygon Status verified
-    filter1_marked = df[
-        df[POLYGON_STATUS_COL].isin([VERIFIED_QA, "VerifiedAdmin"])
-    ]
+    # Combined into ONE mask (rather than summing separate filter lengths)
+    # so a row matching more than one condition at once - e.g. a QC-error
+    # row like Multi-Level WITH a Polygon Status set - doesn't get counted
+    # twice. That double-counting bug existed in the original code; this
+    # fixes it as part of adding the new rooftop-accuracy rule.
 
-    # Filter 2 — constructionFlag = Mall Tenant or Multi Level
-    filter2_marked = df[
-        df[CONSTRUCTION_FLAG_COL].isin([MALL_TENANT, MULTI_LEVEL])
-    ]
+    # Condition 1 — Polygon Status verified
+    cond1_verified_status = df[POLYGON_STATUS_COL].isin([VERIFIED_QA, VERIFIED_ADMIN])
 
-    marked_count = len(filter1_marked) + len(filter2_marked)
+    # Condition 2 — constructionFlag = Mall Tenant or Multi Level
+    cond2_flagged_type = df[CONSTRUCTION_FLAG_COL].isin([MALL_TENANT, MULTI_LEVEL])
+
+    # Condition 3 (NEW) — Polygon Status still None/Draft, but Geo Accuracy
+    # is already a verified-rooftop value. Means an analyst has manually
+    # pinned the exact location using the geofencer, even though Polygon
+    # Status hasn't caught up yet - so treat it as Marked.
+    # Restricted to Normal-flagged records only:
+    #   - Mall Tenant/Multi-Level already covered by condition 2
+    #   - Construction is deliberately EXCLUDED - those always stay
+    #     Pending regardless of Geo Accuracy (a rooftop-verified
+    #     Construction record is a QC error, not a completed one)
+    cond3_rooftop_verified = (
+        (df[POLYGON_STATUS_COL].isin(["None", "Draft"])) &
+        (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
+        (df[GEO_ACCURACY_COL].isin(GEO_ACCURACY_VERIFIED_VALUES))
+    )
+
+    marked_mask = cond1_verified_status | cond2_flagged_type | cond3_rooftop_verified
+    marked_count = int(marked_mask.sum())
+
+    # Kept separately for the "Polygon Done" breakdown metric below -
+    # deliberately NOT deduplicated against the other conditions, since
+    # this one specifically describes "Polygon Status is explicitly set",
+    # regardless of any overlap with Mall Tenant/Multi-Level QC errors.
+    filter1_marked = df[cond1_verified_status]
 
     # ── PENDING ──────────────────────────────────────
-    # Both conditions must be true simultaneously
+    # Same as before, EXCEPT Normal-flagged records with a verified-rooftop
+    # Geo Accuracy are excluded here (they moved to Marked via filter3
+    # above). Construction records stay Pending unconditionally.
     pending_rows = df[
         (df[POLYGON_STATUS_COL].isin(["None", "Draft"])) &
-        (df[CONSTRUCTION_FLAG_COL].isin([NORMAL, CONSTRUCTION]))
+        (
+            (df[CONSTRUCTION_FLAG_COL] == CONSTRUCTION) |
+            (
+                (df[CONSTRUCTION_FLAG_COL] == NORMAL) &
+                (~df[GEO_ACCURACY_COL].isin(GEO_ACCURACY_VERIFIED_VALUES))
+            )
+        )
     ]
 
     pending_count = len(pending_rows)
@@ -222,11 +267,8 @@ def polygon_coverage(dataframe):
     # Polygon Done
     polygon_done_count = len(filter1_marked)
 
-    # Polygon Missing — Normal or Construction + no polygon
-    polygon_missing_count = len(df[
-        (df[POLYGON_STATUS_COL].isin(["None", "Draft"])) &
-        (df[CONSTRUCTION_FLAG_COL].isin([NORMAL, CONSTRUCTION]))
-    ])
+    # Polygon Missing — same definition as pending_count now
+    polygon_missing_count = pending_count
 
     # Mall Tenant count
     mall_tenant_count = len(df[df[CONSTRUCTION_FLAG_COL] == MALL_TENANT])
@@ -248,7 +290,9 @@ def polygon_coverage(dataframe):
         "mall_tenant_count"     : mall_tenant_count,
         "multi_level_count"     : multi_level_count,
         "construction_count"    : construction_count,
-        "pending_rows"          : pending_rows    # ← add this line
+        # NOTE: pending_rows dropped from the returned dict per decision -
+        # the raw row-by-row pending list wasn't being used for anything.
+        # pending_count above still reflects the correct total.
     }
     logger.info(f"polygon_coverage() | marked: {marked_count} | pending: {pending_count}")
     return result

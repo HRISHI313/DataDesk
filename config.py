@@ -37,11 +37,20 @@ HIDE_TRAFFIC_FOR_COL   = "hideTrafficFor"
 CONSTRUCTION_FLAG_COL  = "constructionFlag"
 
 # TAG VALUES — keep original casing as these are data values not column names
-CONSTRUCTION = "Construction"
-MALL_TENANT  = "Mall Tenant"
-MULTI_LEVEL  = "Multi-Level"
-VERIFIED_QA  = "VerifiedQA"
-NORMAL       = "Normal"
+CONSTRUCTION   = "Construction"
+MALL_TENANT    = "Mall Tenant"
+MULTI_LEVEL    = "Multi-Level"
+VERIFIED_QA    = "VerifiedQA"
+VERIFIED_ADMIN = "VerifiedAdmin"
+NORMAL         = "Normal"
+
+# GEO ACCURACY — values that mean an analyst has manually pinned the exact
+GEO_ACCURACY_RETAILSTAT_VERIFIED = "RETAILSTAT VERIFIED: ROOFTOP"
+GEO_ACCURACY_AGGDATA_VERIFIED    = "AGGDATA_VERIFIED: ROOFTOP"
+GEO_ACCURACY_VERIFIED_VALUES     = [
+    GEO_ACCURACY_RETAILSTAT_VERIFIED,
+    GEO_ACCURACY_AGGDATA_VERIFIED,
+]
 
 # Comparison Types
 COMPARISON_ALI       = "ALI"

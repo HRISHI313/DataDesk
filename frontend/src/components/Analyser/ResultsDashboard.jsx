@@ -14,7 +14,6 @@ export default function ResultsDashboard({ results }) {
     duplicate_ali,
     parent_ali,
     qc_errors,
-    polygon_coverage,
   } = results;
 
   const hasQcErrors = qc_errors.total_errors > 0;
@@ -24,50 +23,8 @@ export default function ResultsDashboard({ results }) {
     <div className="results-dashboard">
       <SummaryCards results={results} />
 
-      <div className="dashboard-grid">
-        <section className="dashboard-panel">
-          <h3>Records per retailer</h3>
-          <DataTable rows={per_retailer} />
-        </section>
-
-        <section className="dashboard-panel">
-          <h3>Verification status</h3>
-          <PctBreakdown data={polygon_pct} />
-        </section>
-      </div>
-
-      <div className="dashboard-grid">
-        <section className="dashboard-panel">
-          <h3>Location type breakdown</h3>
-          <PctBreakdown data={construction_pct} />
-        </section>
-
-        <section className="dashboard-panel">
-          <h3>Parent ALI linkage</h3>
-          <PctBreakdown
-            data={{
-              Connected: parent_ali.connected,
-              Unknown: parent_ali.unknown,
-            }}
-          />
-        </section>
-      </div>
-
-      <section className="dashboard-panel">
-        <h3>Polygon status by retailer</h3>
-        <DataTable rows={polygon_status} />
-      </section>
-
-      <section className="dashboard-panel">
-        <h3>Location type by retailer</h3>
-        <DataTable rows={construction_flag} />
-      </section>
-
-      <section className="dashboard-panel">
-        <h3>Parent ALI by retailer</h3>
-        <DataTable rows={parent_ali.per_retailer} />
-      </section>
-
+      {/* QC Errors first - the actionable "fix this" signal, so it's the
+          first thing an analyst sees, not buried at the bottom. */}
       <CollapsibleSection
         title="QC Errors"
         badge={qc_errors.total_errors}
@@ -89,11 +46,59 @@ export default function ResultsDashboard({ results }) {
         )}
         {qc_errors.construction_errors.length > 0 && (
           <>
-            <h4>Construction record errors</h4>
+            <h4>Construction records that look already completed</h4>
+            <p className="dashboard-hint">
+              Has a Polygon Status set, or Geo Accuracy already shows a verified rooftop pin -
+              shouldn't happen for a site still under construction.
+            </p>
             <DataTable rows={qc_errors.construction_errors} />
           </>
         )}
       </CollapsibleSection>
+
+      <div className="dashboard-grid">
+        <section className="dashboard-panel">
+          <h3>Records per retailer</h3>
+          <DataTable rows={per_retailer} />
+        </section>
+
+        <section className="dashboard-panel">
+          <h3>Verification status</h3>
+          <PctBreakdown data={polygon_pct} />
+        </section>
+      </div>
+
+      <div className="dashboard-grid">
+        <section className="dashboard-panel">
+          <h3>Geofencing type breakdown</h3>
+          <PctBreakdown data={construction_pct} />
+        </section>
+
+        <section className="dashboard-panel">
+          <h3>Parent ALI linkage</h3>
+          <PctBreakdown
+            data={{
+              Connected: parent_ali.connected,
+              Unknown: parent_ali.unknown,
+            }}
+          />
+        </section>
+      </div>
+
+      <section className="dashboard-panel">
+        <h3>Polygon status by retailer</h3>
+        <DataTable rows={polygon_status} />
+      </section>
+
+      <section className="dashboard-panel">
+        <h3>Geofencing type by retailer</h3>
+        <DataTable rows={construction_flag} />
+      </section>
+
+      <section className="dashboard-panel">
+        <h3>Parent ALI by retailer</h3>
+        <DataTable rows={parent_ali.per_retailer} />
+      </section>
 
       <CollapsibleSection
         title="Duplicate ALIs"
@@ -102,17 +107,6 @@ export default function ResultsDashboard({ results }) {
       >
         {!hasDuplicates && <p className="dashboard-clean-msg">No duplicate ALIs found.</p>}
         {hasDuplicates && <DataTable rows={duplicate_ali.duplicate_rows} />}
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="Pending records"
-        badge={polygon_coverage.pending_count}
-        badgeTone="warn"
-      >
-        <p className="dashboard-hint">
-          Records with no Polygon Status and not Mall Tenant/Multi-Level - these need drawing.
-        </p>
-        <DataTable rows={polygon_coverage.pending_rows} />
       </CollapsibleSection>
     </div>
   );
