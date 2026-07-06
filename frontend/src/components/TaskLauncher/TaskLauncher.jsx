@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import UploadStep from "./UploadStep";
 import MultiAssignStep from "./MultiAssignStep";
 import SingleAssignStep from "./SingleAssignStep";
 import { clearUpload } from "../../api/taskLauncher";
 import "./TaskLauncher.css";
 
-export default function TaskLauncher() {
+export default function TaskLauncher({ initialData, onInitialDataConsumed }) {
   const [uploadData, setUploadData] = useState(null); // {upload_id, mode, total_alis, retailer_counts}
   const [done, setDone] = useState(false);
+
+  // If Analyser's "Launch Task" handed off pre-filtered data, load it
+  // straight in - skipping the upload step entirely.
+  useEffect(() => {
+    if (initialData) {
+      setUploadData(initialData);
+      setDone(false);
+      onInitialDataConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
 
   function handleUploaded(data) {
     setUploadData(data);

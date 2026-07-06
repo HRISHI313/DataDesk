@@ -5,6 +5,12 @@ import "./App.css";
 
 function App() {
   const [tab, setTab] = useState("analyser");
+  const [taskLauncherPreload, setTaskLauncherPreload] = useState(null);
+
+  function handleLaunchTask(taskData) {
+    setTaskLauncherPreload(taskData);
+    setTab("task-launcher");
+  }
 
   return (
     <div className="app-shell">
@@ -12,6 +18,15 @@ function App() {
         <div className="app-wordmark">
           <span className="wordmark-dot" />
           DataDesk
+          <span style={{
+          fontSize: '10px',
+          fontWeight: 700,
+          color: 'var(--accent)',
+          background: 'rgba(76, 141, 255, 0.15)',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          marginLeft: '4px'
+  }}>V2</span>
         </div>
         <nav className="app-nav">
           <button
@@ -32,8 +47,13 @@ function App() {
       </aside>
 
       <main className="app-main">
-        {tab === "analyser" && <Analyser />}
-        {tab === "task-launcher" && <TaskLauncher />}
+        {tab === "analyser" && <Analyser onLaunchTask={handleLaunchTask} />}
+        {tab === "task-launcher" && (
+          <TaskLauncher
+            initialData={taskLauncherPreload}
+            onInitialDataConsumed={() => setTaskLauncherPreload(null)}
+          />
+        )}
       </main>
     </div>
   );

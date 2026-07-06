@@ -17,13 +17,21 @@ import json
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from utils.file_handler import read_excel
 from utils.validators import validate_file_not_empty, check_required_columns
 from modules.analyser import get_full_analysis
+from modules.task_launcher import detect_retailer_mode, get_retailer_counts
 from utils.serializers import serialize_for_json
+from utils.upload_cache import store_dataframe, get_entry
+from config import GEO_ACCURACY_COL, GEO_ACCURACY_VERIFIED_VALUES
 
 router = APIRouter()
+
+
+class LaunchTaskRequest(BaseModel):
+    upload_id: str
 
 
 def _uploaded_file_to_dataframe(file: UploadFile, raw_bytes: bytes):
@@ -75,9 +83,12 @@ async def upload_and_analyse(file: UploadFile = File(...)):
 
     results = get_full_analysis(df)
 
+    upload_id = store_dataframe(df, mode="analyser")
+
     payload = {
         "needs_mapping": False,
         "row_count": len(df),
+        "upload_id": upload_id,
         "results": serialize_for_json(results),
     }
     return JSONResponse(content=payload)
@@ -88,13 +99,7 @@ async def upload_with_mapping(
     file: UploadFile = File(...),
     mapping: str = Form(...),
 ):
-    """
-    Second-pass upload: called after the user fills in the column mapping
-    form returned by /upload. `mapping` is a JSON string like:
-        {"Store Address": "Address", "Store City": "City"}
-    (i.e. {existing_column_in_file: required_column_name}), matching the
-    same rename direction used in handle_column_mapping().
-    """
+
     raw_bytes = await file.read()
 
     try:
@@ -123,9 +128,45 @@ async def upload_with_mapping(
 
     results = get_full_analysis(df)
 
+    upload_id = store_dataframe(df, mode="analyser")
+
     payload = {
         "needs_mapping": False,
         "row_count": len(df),
+        "upload_id": upload_id,
         "results": serialize_for_json(results),
     }
     return JSONResponse(content=payload)
+
+
+@router.post("/launch-task")
+def launch_task(body: LaunchTaskRequest):
+    entry = get_entry(body.upload_id)
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Original upload not found or expired - please re-upload and re-analyse the file.",
+        )
+
+    df = entry["df"]
+
+    needs_work = df[~df[GEO_ACCURACY_COL].isin(GEO_ACCURACY_VERIFIED_VALUES)].copy()
+
+    if len(needs_work) == 0:
+        return {
+            "upload_id": None,
+            "mode": None,
+            "total_alis": 0,
+            "retailer_counts": {},
+        }
+
+    mode = detect_retailer_mode(needs_work)
+    retailer_counts = get_retailer_counts(needs_work)
+    new_upload_id = store_dataframe(needs_work, mode)
+
+    return {
+        "upload_id": new_upload_id,
+        "mode": mode,
+        "total_alis": len(needs_work),
+        "retailer_counts": retailer_counts,
+    }

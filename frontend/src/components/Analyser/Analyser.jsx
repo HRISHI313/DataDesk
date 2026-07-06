@@ -3,8 +3,8 @@ import AnalyserUploadStep from "./AnalyserUploadStep";
 import ResultsDashboard from "./ResultsDashboard";
 import "./Analyser.css";
 
-export default function Analyser() {
-  const [data, setData] = useState(null); // {row_count, results}
+export default function Analyser({ onLaunchTask }) {
+  const [data, setData] = useState(null); // {row_count, upload_id, results}
 
   function handleStartOver() {
     setData(null);
@@ -22,7 +22,13 @@ export default function Analyser() {
       </header>
 
       {!data && <AnalyserUploadStep onUploaded={setData} />}
-      {data && <ResultsDashboard results={data.results} />}
+      {data && (
+        <ResultsDashboard
+          results={data.results}
+          uploadId={data.upload_id}
+          onLaunchTask={onLaunchTask}
+        />
+      )}
     </div>
   );
 }

@@ -2,9 +2,10 @@ import SummaryCards from "./SummaryCards";
 import PctBreakdown from "./PctBreakdown";
 import DataTable from "./DataTable";
 import CollapsibleSection from "./CollapsibleSection";
+import LaunchTaskBar from "./LaunchTaskBar";
 import "./ResultsDashboard.css";
 
-export default function ResultsDashboard({ results }) {
+export default function ResultsDashboard({ results, uploadId, onLaunchTask }) {
   const {
     per_retailer,
     construction_flag,
@@ -22,6 +23,8 @@ export default function ResultsDashboard({ results }) {
   return (
     <div className="results-dashboard">
       <SummaryCards results={results} />
+
+      <LaunchTaskBar uploadId={uploadId} onLaunchTask={onLaunchTask} />
 
       {/* QC Errors first - the actionable "fix this" signal, so it's the
           first thing an analyst sees, not buried at the bottom. */}
