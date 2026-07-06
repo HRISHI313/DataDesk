@@ -26,7 +26,7 @@ function App() {
           padding: '2px 6px',
           borderRadius: '4px',
           marginLeft: '4px'
-  }}>V2</span>
+  }}>V2.0</span>
         </div>
         <nav className="app-nav">
           <button
