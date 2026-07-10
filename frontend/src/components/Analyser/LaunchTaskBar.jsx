@@ -1,45 +1,125 @@
 import { useState } from "react";
-import { launchTask } from "../../api/analyser";
+import { launchTaskPreview, launchTask } from "../../api/analyser";
 import "./LaunchTaskBar.css";
 
 /**
- * Filters the analysed file down to records that still need work (Geo
- * Accuracy not yet rooftop-verified) and hands that subset straight to
- * Task Launcher's assignment screen - no re-upload needed.
+ * Two-step flow:
+ *  1. Click "Launch Task" -> fetch per-retailer "needs work" counts and
+ *     expand a checklist in place (no page change yet). Retailers with 0
+ *     remaining are shown greyed out and unchecked, not hidden.
+ *  2. Adjust selection if needed, click "Confirm" -> filters to selected
+ *     retailers and hands off to Task Launcher's assignment screen.
  */
 export default function LaunchTaskBar({ uploadId, onLaunchTask }) {
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState("idle"); // idle | loading-preview | reviewing | launching
+  const [retailers, setRetailers] = useState([]); // [{name, needs_work_count}]
+  const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState("");
 
-  async function handleClick() {
+  async function handleOpenChecklist() {
     if (!uploadId) return;
-    setLoading(true);
+    setStep("loading-preview");
     setError("");
     try {
-      const result = await launchTask(uploadId);
+      const result = await launchTaskPreview(uploadId);
+      setRetailers(result.retailers);
+      setSelected(new Set(result.retailers.filter((r) => r.needs_work_count > 0).map((r) => r.name)));
+      setStep("reviewing");
+    } catch (e) {
+      setError(e.message);
+      setStep("idle");
+    }
+  }
+
+  function toggleRetailer(name) {
+    setSelected((s) => {
+      const next = new Set(s);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  }
+
+  async function handleConfirm() {
+    setStep("launching");
+    setError("");
+    try {
+      const result = await launchTask(uploadId, Array.from(selected));
       if (!result.upload_id || result.total_alis === 0) {
-        setError("Nothing to launch - every record already has a verified rooftop pin.");
+        setError("Nothing to launch for the selected lists.");
+        setStep("reviewing");
         return;
       }
       onLaunchTask?.(result);
     } catch (e) {
       setError(e.message);
-    } finally {
-      setLoading(false);
+      setStep("reviewing");
     }
   }
 
-  return (
-    <div className="launch-task-bar">
-      <div className="launch-task-copy">
-        <span className="status-dot pending" />
-        <span>Send records that still need a rooftop pin to Task Launcher.</span>
+  function handleCancel() {
+    setStep("idle");
+    setError("");
+  }
+
+  const selectedTotal = retailers
+    .filter((r) => selected.has(r.name))
+    .reduce((sum, r) => sum + r.needs_work_count, 0);
+
+  if (step === "idle" || step === "loading-preview") {
+    return (
+      <div className="launch-task-bar">
+        <div className="launch-task-copy">
+          <span className="status-dot pending" />
+          <span>Send records that still need a rooftop pin to Task Launcher.</span>
+        </div>
+        <div className="launch-task-actions">
+          {error && <span className="launch-task-error">{error}</span>}
+          <button onClick={handleOpenChecklist} disabled={!uploadId || step === "loading-preview"}>
+            {step === "loading-preview" ? "Loading..." : "Launch Task"}
+          </button>
+        </div>
       </div>
-      <div className="launch-task-actions">
-        {error && <span className="launch-task-error">{error}</span>}
-        <button onClick={handleClick} disabled={loading || !uploadId}>
-          {loading ? "Preparing..." : "Launch Task"}
-        </button>
+    );
+  }
+
+  return (
+    <div className="launch-task-bar expanded">
+      <div className="launch-task-checklist-header">
+        <span className="status-dot pending" />
+        <span>Choose which lists to launch</span>
+      </div>
+
+      <div className="launch-task-checklist">
+        {retailers.map((r) => {
+          const isEmpty = r.needs_work_count === 0;
+          return (
+            <label key={r.name} className={isEmpty ? "checklist-row disabled" : "checklist-row"}>
+              <input
+                type="checkbox"
+                checked={selected.has(r.name)}
+                disabled={isEmpty}
+                onChange={() => toggleRetailer(r.name)}
+              />
+              <span className="checklist-name">{r.name}</span>
+              <span className="checklist-count">
+                {isEmpty ? "nothing pending" : `${r.needs_work_count} need pinning`}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      <div className="launch-task-footer">
+        <span className="launch-task-total">{selectedTotal} records selected</span>
+        <div className="launch-task-actions">
+          {error && <span className="launch-task-error">{error}</span>}
+          <button className="secondary" onClick={handleCancel} disabled={step === "launching"}>
+            Cancel
+          </button>
+          <button onClick={handleConfirm} disabled={selected.size === 0 || step === "launching"}>
+            {step === "launching" ? "Launching..." : "Confirm & Launch"}
+          </button>
+        </div>
       </div>
     </div>
   );

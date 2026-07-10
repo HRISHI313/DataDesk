@@ -18,15 +18,6 @@ function App() {
         <div className="app-wordmark">
           <span className="wordmark-dot" />
           DataDesk
-          <span style={{
-          fontSize: '10px',
-          fontWeight: 700,
-          color: 'var(--accent)',
-          background: 'rgba(76, 141, 255, 0.15)',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          marginLeft: '4px'
-  }}>V2.0</span>
         </div>
         <nav className="app-nav">
           <button

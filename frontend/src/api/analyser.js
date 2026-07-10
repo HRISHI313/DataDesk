@@ -33,11 +33,28 @@ export async function uploadAnalyserFileWithMapping(file, mapping) {
   return res.json();
 }
 
-export async function launchTask(uploadId) {
-  const res = await fetch(`${BASE_URL}/launch-task`, {
+export async function launchTaskPreview(uploadId) {
+  const res = await fetch(`${BASE_URL}/launch-task-preview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ upload_id: uploadId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Preview failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function launchTask(uploadId, selectedRetailers) {
+  const res = await fetch(`${BASE_URL}/launch-task`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_id: uploadId,
+      selected_retailers: selectedRetailers,
+    }),
   });
 
   if (!res.ok) {
